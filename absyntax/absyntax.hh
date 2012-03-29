@@ -47,6 +47,7 @@
 
 
 #include <stdio.h> // required for NULL
+#include <vector>
 
 /* Forward declaration of the visitor interface
  * dclared in the visitor.hh file
@@ -76,6 +77,14 @@ class symbol_c {
     int last_column;
     const char *last_file;  /* filename referenced by last line/column */
     long int last_order;    /* relative order in which it is read by lexcial analyser */
+    std::vector <symbol_c *> candidate_datatypes; /* All possible data types the expression/literal/etc. may take. Filled in stage3 by fill_candidate_datatypes_c class */
+    /* Data type of the expression/literal/etc. Filled in stage3 by narrow_candidate_datatypes_c 
+     * If set to NULL, it means it has not yet been evaluated.
+     * If it points to an object of type invalid_type_name_c, it means it is invalid.
+     * Otherwise, it points to an object of the apropriate data type (e.g. int_type_name_c, bool_type_name_c, ...)
+     */
+    symbol_c *datatype;    
+
 
   public:
     /* default constructor */
@@ -125,6 +134,8 @@ class list_c: public symbol_c {
      /* To insert into the begining of list, call with pos=0  */
      /* To insert into the end of list, call with pos=list->n */
     virtual void insert_element(symbol_c *elem, int pos = 0);
+     /* remove element at position pos. */
+    virtual void remove_element(int pos = 0);
 };
 
 

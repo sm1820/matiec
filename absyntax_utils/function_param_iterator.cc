@@ -206,7 +206,9 @@ void function_param_iterator_c::reset(void) {
   _first_extensible_param_index = -1;
   current_param_is_extensible = false;
   current_param_name = NULL;
-  current_param_type = current_param_default_value = NULL;
+  current_param_type = NULL;
+  current_param_default_value = NULL;
+  last_returned_parameter = NULL; /* the last parameter returned by search() or next() */
 }
 
 
@@ -223,7 +225,8 @@ function_param_iterator_c::function_param_iterator_c(symbol_c *pou_decl) {
   function_block_declaration_c *fb_decl = dynamic_cast<function_block_declaration_c *>(pou_decl);
   program_declaration_c        * p_decl = dynamic_cast<program_declaration_c        *>(pou_decl);
 
-  if ((NULL == f_decl) && (NULL == fb_decl) && (NULL == p_decl)) ERROR;
+  if ((NULL == f_decl) && (NULL == fb_decl) && (NULL == p_decl)) 
+    ERROR;
 
   /* OK. Now initialise this object... */
   this->f_decl = pou_decl;
@@ -248,6 +251,7 @@ identifier_c *function_param_iterator_c::next(void) {
     return current_param_name;
   }
   
+  last_returned_parameter = NULL; 
   param_count = 0;
   en_eno_param_implicit = false;
   next_param++;
@@ -268,6 +272,7 @@ identifier_c *function_param_iterator_c::next(void) {
   if (identifier == NULL)
     ERROR;
   current_param_name = identifier;
+  last_returned_parameter = current_param_name; 
   return current_param_name;
 }
 
@@ -281,35 +286,53 @@ identifier_c *function_param_iterator_c::search(symbol_c *param_name) {
   current_operation = function_param_iterator_c::search_op;
   void *res = f_decl->accept(*this);
   identifier_c *res_param_name = dynamic_cast<identifier_c *>((symbol_c *)res);
+  last_returned_parameter = res_param_name; 
   return res_param_name;
 }
+
+identifier_c *function_param_iterator_c::search(const char *param_name) {
+  identifier_c   param_name_id(param_name);
+  return search(&param_name_id);
+}
+
+
 
 /* Returns the currently referenced parameter's default value,
  * or NULL if none is specified in the function declrataion itself.
  */
 symbol_c *function_param_iterator_c::default_value(void) {
+  if (NULL == last_returned_parameter) 
+    return NULL;
   return current_param_default_value;
 }
 
 /* Returns the currently referenced parameter's type name. */
 symbol_c *function_param_iterator_c::param_type(void) {
+  if (NULL == last_returned_parameter) 
+    return NULL;
   return current_param_type;
 }
 
 /* Returns if currently referenced parameter is an implicit defined EN/ENO parameter. */
 bool function_param_iterator_c::is_en_eno_param_implicit(void) {
+  if (NULL == last_returned_parameter) 
+    ERROR;
   return en_eno_param_implicit;
 }
 
 /* Returns if currently referenced parameter is an extensible parameter. */
 /* extensible paramters only occur in some standard functions, e.g. AND(word#34, word#44, word#65); */
 bool function_param_iterator_c::is_extensible_param(void) {
+  if (NULL == last_returned_parameter) 
+    ERROR;
   return current_param_is_extensible;
 }
 
 /* Returns the index of the current extensible parameter. */             
 /* If the current parameter is not an extensible paramter, returns -1 */
 int function_param_iterator_c::extensible_param_index(void) {
+  if (NULL == last_returned_parameter) 
+    ERROR;
   return (current_param_is_extensible? current_extensible_param_index : -1);
 }
 
@@ -323,6 +346,8 @@ int function_param_iterator_c::first_extensible_param_index(void) {
  * i.e. VAR_INPUT, VAR_OUTPUT or VAR_INOUT
  */
 function_param_iterator_c::param_direction_t function_param_iterator_c::param_direction(void) {
+  if (NULL == last_returned_parameter) 
+    ERROR;
   return current_param_direction;
 }
 
