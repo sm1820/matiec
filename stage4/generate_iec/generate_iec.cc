@@ -58,6 +58,10 @@
 
 
 
+#define ERROR error_exit(__FILE__,__LINE__)
+/* function defined in main.cc */
+extern void error_exit(const char *file_name, int line_no);
+
 
 
 
@@ -153,6 +157,13 @@ void *visit(eno_param_c *symbol) {
 #endif
 
 
+/* A class used to identify an entry (literal, variable, etc...) in the abstract syntax tree with an invalid data type */
+/* This is only used from stage3 onwards. Stages 1 and 2 will never create any instances of invalid_type_name_c */
+// SYM_REF0(invalid_type_name_c)
+void *visit(invalid_type_name_c *symbol) {
+  ERROR;
+  return NULL;
+}
 
 
 /******************/
@@ -1669,6 +1680,17 @@ void *visit(il_operand_list_c *symbol) {
 void *visit(simple_instr_list_c *symbol) {
   return print_list(symbol,  s4o.indent_spaces, "\n" + s4o.indent_spaces, "\n");
 }
+
+
+/* il_simple_instruction:
+ *   il_simple_operation eol_list
+ * | il_expression eol_list
+ * | il_formal_funct_call eol_list
+ */
+void *visit(il_simple_instruction_c *symbol)	{
+  return symbol->il_simple_instruction->accept(*this);
+}
+
 
 /* | il_initial_param_list il_param_instruction */
 void *visit(il_param_list_c *symbol) {
