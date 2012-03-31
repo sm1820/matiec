@@ -250,17 +250,9 @@ void print_err_msg(int first_line,
  * declared twice.
  * We therefore use the #if !defined YYLTYPE ...
  * to make sure only the first declaration is parsed by the C++ compiler.
- *
- * At first glance it seems that what we really should do is delcare the
- * YYLTYPE directly as an anonymous struct, thus:
- * #define YYLTYPE struct{ ...}
- * however, this also results in compilation errors.
- *
- * I (Mario) think this is kind of a hack. If you know how to
- * do this re-declaration of YYLTYPE properly, please let me know!
  */
 #if ! defined YYLTYPE && ! defined YYLTYPE_IS_DECLARED
-  typedef struct {
+typedef struct YYLTYPE {
     int         first_line;
     int         first_column;
     const char *first_file;
@@ -269,9 +261,11 @@ void print_err_msg(int first_line,
     int         last_column;
     const char *last_file;
     long int    last_order;
-  } yyltype__local;
-  #define YYLTYPE yyltype__local
+} YYLTYPE;
+#define YYLTYPE_IS_DECLARED 1
+#define YYLTYPE_IS_TRIVIAL 1
 #endif
+
 }
 
 
@@ -2797,7 +2791,7 @@ subrange:
 | signed_integer DOTDOT error
 	{$$ = NULL;
 	 if (is_current_syntax_token()) {print_err_msg(locl(@2), locf(@3), "no value defined for upper bound in subrange definition.");}
-	 else {print_err_msg(locf(@3), locl(@3), "invalid value for upper bound in subrange definition."); yyclearin;}
+	 else {print_err_msg(locf(@3), locl(@3), "invalid value for lower bound in subrange definition."); yyclearin;}
 	 yyerrok;
 	}
 /* ERROR_CHECK_END */
@@ -3407,7 +3401,7 @@ structured_variable:
   record_variable '.' field_selector
 	{$$ = new structured_variable_c($1, $3, locloc(@$));}
 | record_variable '.' il_simple_operator_clash3
-    {$$ = new structured_variable_c($1, $3, locloc(@$));}
+    {$$ = new structured_variable_c($1, il_operator_c_2_identifier_c($3), locloc(@$));}
 ;
 
 
@@ -6643,8 +6637,11 @@ simple_instr_list:
 
 il_simple_instruction:
   il_simple_operation eol_list
+	{$$ = new il_simple_instruction_c($1, locloc(@$));}
 | il_expression eol_list
+	{$$ = new il_simple_instruction_c($1, locloc(@$));}
 | il_formal_funct_call eol_list
+	{$$ = new il_simple_instruction_c($1, locloc(@$));}
 /* ERROR_CHECK_BEGIN */
 | il_expression error
   {$$ = NULL; print_err_msg(locl(@1), locf(@2), "EOL missing after expression IL instruction."); yyerrok;}

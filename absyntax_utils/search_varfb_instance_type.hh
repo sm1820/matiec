@@ -1,7 +1,7 @@
 /*
  *  matiec - a compiler for the programming languages defined in IEC 61131-3
  *
- *  Copyright (C) 2003-2011  Mario de Sousa (msousa@fe.up.pt)
+ *  Copyright (C) 2003-2012  Mario de Sousa (msousa@fe.up.pt)
  *  Copyright (C) 2007-2011  Laurent Bessard and Edouard Tisserant
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -77,41 +77,44 @@
  *
  * Member functions:
  * ================
+ *   get_basetype_id()    ---> returns 2A   (implemented, although currently it is not needed! )
  *   get_basetype_decl()  ---> returns 2B 
  *   get_type_id()        ---> returns 1A
  * 
- *   Since we haven't yet needed them, we don't yet implement
- *   get_basetype_id()    ----> would return 2A
- *   get_type_decl()      ----> would return 1B
+ *   Since we haven't yet needed it, we don't yet implement
+ *   get_type_decl()      ---> returns 1B 
  */ 
 
-class search_varfb_instance_type_c: public search_base_type_c {
+class search_varfb_instance_type_c : null_visitor_c {
 
   private:
     search_var_instance_decl_c search_var_instance_decl;
-    decompose_var_instance_name_c *decompose_var_instance_name;
-    symbol_c *current_structelement_name;
-    symbol_c *current_typeid;
-    symbol_c *current_basetypeid;
+    search_base_type_c         search_base_type;
+
+//  symbol_c *current_type_decl;
+    symbol_c *current_type_id;
+    symbol_c *current_basetype_decl;
+    symbol_c *current_basetype_id;
+    
+    symbol_c *current_field_selector;
+
     bool is_complex;
+    
+    /* sets all the above variables to NULL, or false */
+    void init(void);
 
   public:
     search_varfb_instance_type_c(symbol_c *search_scope);
     symbol_c *get_basetype_decl(symbol_c *variable_name);
-    symbol_c *get_type_decl(symbol_c *variable_name);
+    symbol_c *get_basetype_id  (symbol_c *variable_name);
+//     symbol_c *get_type_decl(symbol_c *variable_name);
     symbol_c *get_type_id(symbol_c *variable_name);
 
-    /* NOTE: this function should be remvoed/deleted.
+    /* NOTE: I have a feeling that this function should be remvoed/deleted.
      *       However, it is currently used in stage 4, and before deleting it
      *       requires that the stage4 code be analysed and fixed (i.e. replace by 
      *       a call to one of the above functions get_basetype_decl(), 
      *       get_type_decl(), get_type_id().
-     *
-     *      At the moment, I have a feeling that this whole class search_varfb_instance_type_c
-     *      will not be needed in the future (i.e. when we finish implementing type checking
-     *      in stage 3 correctly, where we store on each symbol in the abstract syntax
-     *      tree it's data type, so stage4 implementations will not need to deduce the data
-     *      types again), so it does not make much sense to spend more time on it.
      */
     unsigned int get_vartype(symbol_c *variable_name);
     bool type_is_complex(void);
@@ -125,17 +128,17 @@ class search_varfb_instance_type_c: public search_base_type_c {
 
 
   private:
-    /* We override the base class' visitor to identifier_c.
-     * This is so because the base class does not consider a function block
-     * to be a type, unlike this class that allows a variable instance
-     * of a function block type...
-     */
-    void *visit(identifier_c *type_name);
-
+    /*************************/
+    /* B.1 - Common elements */
+    /*************************/
+    /*******************************************/
+    /* B 1.1 - Letters, digits and identifiers */
+    /*******************************************/
+    void *visit(identifier_c *variable_name);
+      
     /********************************/
     /* B 1.3.3 - Derived data types */
     /********************************/
-    
     /*  identifier ':' array_spec_init */
     void *visit(array_type_declaration_c *symbol);
     
@@ -170,7 +173,20 @@ class search_varfb_instance_type_c: public search_base_type_c {
     void *visit(structure_element_initialization_c *symbol); /* should never get called... */
 
 
+    /*********************/
+    /* B 1.4 - Variables */
+    /*********************/
+    void *visit(symbolic_variable_c *symbol);
 
+    /********************************************/
+    /* B.1.4.1   Directly Represented Variables */
+    /********************************************/
+    /*************************************/
+    /* B 1.4.2 - Multi-element variables */
+    /*************************************/
+    void *visit(array_variable_c *symbol);
+    void *visit(structured_variable_c *symbol);
+    
     /**************************************/
     /* B.1.5 - Program organization units */
     /**************************************/

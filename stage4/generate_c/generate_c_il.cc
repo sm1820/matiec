@@ -1562,6 +1562,12 @@ void *visit(simple_instr_list_c *symbol) {
   return NULL;
 }
 
+// SYM_REF1(il_simple_instruction_c, il_simple_instruction, symbol_c *prev_il_instruction;)
+void *visit(il_simple_instruction_c *symbol)	{
+  return symbol->il_simple_instruction->accept(*this);
+}
+
+
 /* | il_initial_param_list il_param_instruction */
 // SYM_LIST(il_param_list_c)
 void *visit(il_param_list_c *symbol) {ERROR; return NULL;} // should never get called!
@@ -1640,6 +1646,12 @@ void *visit(STN_operator_c *symbol)	{
 }
 
 void *visit(NOT_operator_c *symbol)	{
+  /* NOTE: the standard allows syntax in which the NOT operator is followed by an optional <il_operand>
+   *              NOT [<il_operand>]
+   *       However, it does not define the semantic of the NOT operation when the <il_operand> is specified.
+   *       We therefore consider it an error if an il_operand is specified!
+   *       The error is caught in stage 3!
+   */  
   if ((NULL != this->current_operand) || (NULL != this->current_operand_type)) ERROR;
   XXX_operator(&(this->default_variable_name),
                search_expression_type->is_bool_type(this->default_variable_name.current_type)?" = !":" = ~",
