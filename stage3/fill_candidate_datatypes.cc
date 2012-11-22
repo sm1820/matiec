@@ -75,29 +75,6 @@
 
 
 
-#define FIRST_(symbol1, symbol2) (((symbol1)->first_order < (symbol2)->first_order)   ? (symbol1) : (symbol2))
-#define  LAST_(symbol1, symbol2) (((symbol1)->last_order  > (symbol2)->last_order)    ? (symbol1) : (symbol2))
-
-
-#define STAGE3_ERROR(error_level, symbol1, symbol2, ...) {                                                                  \
-    fprintf(stderr, "%s:%d-%d..%d-%d: error: ",                                                                             \
-            FIRST_(symbol1,symbol2)->first_file, FIRST_(symbol1,symbol2)->first_line, FIRST_(symbol1,symbol2)->first_column,\
-                                                 LAST_(symbol1,symbol2) ->last_line,  LAST_(symbol1,symbol2) ->last_column);\
-    fprintf(stderr, __VA_ARGS__);                                                                                           \
-    fprintf(stderr, "\n");                                                                                                  \
-}  
-
-
-#define STAGE3_WARNING(symbol1, symbol2, ...) {                                                                             \
-    fprintf(stderr, "%s:%d-%d..%d-%d: warning: ",                                                                           \
-            FIRST_(symbol1,symbol2)->first_file, FIRST_(symbol1,symbol2)->first_line, FIRST_(symbol1,symbol2)->first_column,\
-                                                 LAST_(symbol1,symbol2) ->last_line,  LAST_(symbol1,symbol2) ->last_column);\
-    fprintf(stderr, __VA_ARGS__);                                                                                           \
-    fprintf(stderr, "\n");                                                                                                  \
-}  
-
-
-
 /* set to 1 to see debug info during execution */
 static int debug = 0;
 
@@ -161,7 +138,6 @@ class populate_globalenumvalue_symtable_c: public iterator_visitor_c {
     for (; lower != upper; lower++)
       if (lower->second == current_enumerated_type) {
         /*  The same identifier is used more than once as an enumerated value/constant inside the same enumerated datat type! */
-        STAGE3_ERROR(0, symbol, symbol, "Duplicate identifier in enumerated data type.");
         return NULL; /* No need to insert it! It is already in the table! */
       }
 
@@ -229,13 +205,13 @@ static populate_globalenumvalue_symtable_c populate_globalenumvalue_symtable;
 static enumerated_value_symtable_t local_enumerated_value_symtable;
 
 
-class populate_enumvalue_symtable_c: public iterator_visitor_c {
+class populate_localenumvalue_symtable_c: public iterator_visitor_c {
   private:
     symbol_c *current_enumerated_type;
 
   public:
-     populate_enumvalue_symtable_c(void) {current_enumerated_type = NULL;};
-    ~populate_enumvalue_symtable_c(void) {}
+     populate_localenumvalue_symtable_c(void) {current_enumerated_type = NULL;};
+    ~populate_localenumvalue_symtable_c(void) {}
 
   public:
   /*************************/
@@ -271,7 +247,6 @@ class populate_enumvalue_symtable_c: public iterator_visitor_c {
     for (; lower != upper; lower++)
       if (lower->second == current_enumerated_type) {
         /*  The same identifier is used more than once as an enumerated value/constant inside the same enumerated datat type! */
-        STAGE3_ERROR(0, symbol, symbol, "Duplicate identifier in enumerated data type.");
         return NULL; /* No need to insert it! It is already in the table! */
       }
     
@@ -281,7 +256,7 @@ class populate_enumvalue_symtable_c: public iterator_visitor_c {
   }
 }; // class populate_enumvalue_symtable_c
 
-static populate_enumvalue_symtable_c populate_enumvalue_symtable;
+static populate_localenumvalue_symtable_c populate_enumvalue_symtable;
 
 
 
@@ -879,13 +854,25 @@ void *fill_candidate_datatypes_c::visit(subrange_c *symbol) {
 
 /*  enumerated_type_name ':' enumerated_spec_init */
 // SYM_REF2(enumerated_type_declaration_c, enumerated_type_name, enumerated_spec_init)
-/* NOTE: Not required. already handled by iterator_visitor_c base class */
+void *fill_candidate_datatypes_c::visit(enumerated_type_declaration_c *symbol) {
+  current_enumerated_spec_type = base_type(symbol);
+  add_datatype_to_candidate_list(symbol,                       current_enumerated_spec_type);
+  add_datatype_to_candidate_list(symbol->enumerated_type_name, current_enumerated_spec_type);
+  symbol->enumerated_spec_init->accept(*this);
+  current_enumerated_spec_type = NULL;  
+  return NULL;
+}
 
 
 /* enumerated_specification ASSIGN enumerated_value */
 // SYM_REF2(enumerated_spec_init_c, enumerated_specification, enumerated_value)
 void *fill_candidate_datatypes_c::visit(enumerated_spec_init_c *symbol) {
-  current_enumerated_spec_type = symbol;
+  /* If we are handling an anonymous datatype (i.e. a datatype implicitly declared inside a VAR ... END_VAR declaration)
+   * then the symbol->datatype has not yet been set by the previous visit(enumerated_spec_init_c) method!
+   */
+  if (NULL == current_enumerated_spec_type)
+    current_enumerated_spec_type = base_type(symbol);  
+  add_datatype_to_candidate_list(symbol, current_enumerated_spec_type);
   symbol->enumerated_specification->accept(*this); /* calls enumerated_value_list_c (or identifier_c, which we ignore!) visit method */
   current_enumerated_spec_type = NULL;  
   if (NULL != symbol->enumerated_value) symbol->enumerated_value->accept(*this);
@@ -896,20 +883,13 @@ void *fill_candidate_datatypes_c::visit(enumerated_spec_init_c *symbol) {
 /* enumerated_value_list ',' enumerated_value */
 // SYM_LIST(enumerated_value_list_c)
 void *fill_candidate_datatypes_c::visit(enumerated_value_list_c *symbol) {
-  if (NULL == current_enumerated_spec_type) ERROR;
-  
-  /* Actually, all this passing of symbol_c * through the  current_enumerated_spec_type is actually useless, as the base type
-   * is actually this enumerated_value_list_c symbol!!! However, it is safer to do it this way, as we can then later change 
-   * search_base_type_c without having to change this fill_candidate_datatypes_c class too!!
-   */
-  current_enumerated_spec_type = base_type(current_enumerated_spec_type);
-  if (NULL == current_enumerated_spec_type) ERROR;
+  if (NULL == current_enumerated_spec_type) ERROR;  
+  add_datatype_to_candidate_list(symbol, current_enumerated_spec_type);
   
   /* We already know the datatype of the enumerated_value(s) in the list, so we set them directly instead of recursively calling the enumerated_value_c visit method! */
-  for(int i = 0; i < symbol->n; i++) {
+  for(int i = 0; i < symbol->n; i++)
     add_datatype_to_candidate_list(symbol->elements[i], current_enumerated_spec_type);
-    symbol->elements[i]->datatype = current_enumerated_spec_type; // To be consistent, this should really be done in the narrow_candidate_datatypes_c !!
-  }
+
   return NULL;  
 }
 
@@ -930,15 +910,10 @@ void *fill_candidate_datatypes_c::visit(enumerated_value_list_c *symbol) {
 void *fill_candidate_datatypes_c::visit(enumerated_value_c *symbol) {
 	symbol_c *global_enumerated_type;
 	symbol_c *local_enumerated_type;
-	symbol_c *enumerated_type;
+	symbol_c *enumerated_type = NULL;
 
 	if (NULL != symbol->type) {
-#if 1
-		enumerated_type = symbol->type; 
-#else
-		/* NOTE: The following code works but is not complete, that is why it is currently commented out!
-		 *  
-		 *        It is not complete because it does not yet consider the following situation:
+		/* NOTE: This code must take into account the following situation:
 		 *
 		 *        TYPE  
 		 *           base_enum_t: (x1, x2, x3);
@@ -952,10 +927,6 @@ void *fill_candidate_datatypes_c::visit(enumerated_value_c *symbol) {
 		 *             enum_t1#x1
 		 *             enum_t2#x1
 		 *            enum_t12#x1
-		 *
-		 *      However, the following code only considers 
- 		 *         base_enum_t#x1
-		 *      as correct, and all the others as incorrect!
 		 */
 		/* check whether the value really belongs to that datatype!! */
 		/* All local enum values are declared inside anonymous enumeration datatypes (i.e. inside a VAR ... END_VAR declaration, with
@@ -966,9 +937,8 @@ void *fill_candidate_datatypes_c::visit(enumerated_value_c *symbol) {
 		enumerated_value_symtable_t::iterator lower = global_enumerated_value_symtable.lower_bound(symbol->value);
 		enumerated_value_symtable_t::iterator upper = global_enumerated_value_symtable.upper_bound(symbol->value);
 		for (; lower != upper; lower++)
-			if (compare_identifiers(search_base_type_c::get_basetype_id(lower->second), symbol->type) == 0)  // returns 0 if identifiers are equal!!
+			if (get_datatype_info_c::is_type_equal(base_type(lower->second), base_type(symbol->type)))
 				enumerated_type = symbol->type; 
-#endif
 	}
 	else {
 		symbol_c *global_enumerated_type = global_enumerated_value_symtable.find_value  (symbol->value);
@@ -1132,11 +1102,12 @@ void *fill_candidate_datatypes_c::visit(structured_variable_c *symbol) {
 /******************************************/
 
 void *fill_candidate_datatypes_c::visit(var1_list_c *symbol) {
-#if 0   /* We don't really need to set the datatype of each variable. We just check the declaration itself! */
   for(int i = 0; i < symbol->n; i++) {
-    add_datatype_to_candidate_list(symbol->elements[i], search_varfb_instance_type->get_basetype_decl(symbol->elements[i])); /* will only add if non NULL */
+    /* We don't really need to set the datatype of each variable. We just check the declaration itself! 
+    add_datatype_to_candidate_list(symbol->elements[i], search_varfb_instance_type->get_basetype_decl(symbol->elements[i])); // will only add if non NULL 
+    */
+    symbol->elements[i]->accept(*this); // handle the extensible_input_parameter_c, etc...
   }
-#endif
   return NULL;
 }  
 
