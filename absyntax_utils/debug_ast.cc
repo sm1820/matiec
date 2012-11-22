@@ -44,14 +44,32 @@
 #include <unistd.h>
 #include <stdio.h>  /* required for NULL */
 #include "absyntax_utils.hh"
+#include "../absyntax/visitor.hh"
 
 
 
 
 
 
+/*********************************/
+/* Class to print a symbol       */
+/*********************************/
 
 
+class print_symbol_c: public fcall_visitor_c { 
+  public:
+    static void print(symbol_c *symbol);
+    
+  protected:
+    void fcall(symbol_c *symbol);  
+    /* AST symbols with extra data have their own specialised methods for printing that data */
+    void *visit(il_instruction_c *symbol);
+
+  private:
+    static print_symbol_c *singleton;
+    
+    void dump_symbol(symbol_c* symbol);
+};
 
 
 
@@ -70,9 +88,6 @@ void print_symbol_c::print(symbol_c* symbol) {
 
 
 
-
-
-
 void print_symbol_c::fcall(symbol_c* symbol) {
   dump_symbol(symbol);
   fprintf(stderr, "\n");
@@ -85,8 +100,9 @@ void print_symbol_c::dump_symbol(symbol_c* symbol) {
   fprintf(stderr, "  datatype=");
   if (NULL == symbol->datatype)
     fprintf(stderr, "NULL\t\t");
-  else 
-    fprintf(stderr, symbol->datatype->absyntax_cname());
+  else {
+	  fprintf(stderr, "%s", symbol->datatype->absyntax_cname());
+  }
   fprintf(stderr, "\t<-{");
   if (symbol->candidate_datatypes.size() == 0) {
     fprintf(stderr, "\t\t\t\t\t");
@@ -97,9 +113,13 @@ void print_symbol_c::dump_symbol(symbol_c* symbol) {
       else
         fprintf(stderr, "\t\t\t");
   } else {
-    fprintf(stderr, "(%d)\t\t\t\t\t", symbol->candidate_datatypes.size());
+    fprintf(stderr, "(%lu)\t\t\t\t\t", (unsigned long int)symbol->candidate_datatypes.size());
   }
-  fprintf(stderr, "}\t");          
+  fprintf(stderr, "}\t");         
+  
+  /* print the const values... */
+  fprintf(stderr, " constv{f=%f, i=%"PRId64", u=%"PRIu64", b=%d}\t", symbol->const_value._real64.value, symbol->const_value._int64.value, symbol->const_value._uint64.value, symbol->const_value._bool.value?1:0);
+  
 }
 
 
@@ -107,8 +127,9 @@ void print_symbol_c::dump_symbol(symbol_c* symbol) {
 void *print_symbol_c::visit(il_instruction_c *symbol) {
    dump_symbol(symbol);
 
-  fprintf(stderr, "  next_il_=%d ", symbol->next_il_instruction.size());
-  fprintf(stderr, "  prev_il_=%d ", symbol->prev_il_instruction.size());
+   /* NOTE: std::map.size() returns a size_type, whose type is dependent on compiler/platform. To be portable, we need to do an explicit type cast. */
+  fprintf(stderr, "  next_il_=%lu ", (unsigned long int)symbol->next_il_instruction.size());
+  fprintf(stderr, "  prev_il_=%lu ", (unsigned long int)symbol->prev_il_instruction.size());
   
   if (symbol->prev_il_instruction.size() == 0)
     fprintf(stderr, "(----,");
@@ -137,10 +158,22 @@ void *print_symbol_c::visit(il_instruction_c *symbol) {
 
 
 
+/*********************************/
+/* Class to print an AST         */
+/*********************************/
 
-
-
-
+class print_ast_c: public fcall_iterator_visitor_c { 
+  public:
+    static void print(symbol_c *symbol);
+    static void print(const char *str);
+    
+  protected:
+    void prefix_fcall(symbol_c *symbol);
+    void suffix_fcall(symbol_c *symbol);  
+  
+  private:
+    static print_ast_c *singleton;    
+};
 
 
 
@@ -155,6 +188,11 @@ void print_ast_c::print(symbol_c* symbol) {
   symbol->accept(*singleton);
 }
 
+
+void print_ast_c::print(const char *str) {
+  fprintf(stderr, str);
+}
+
   
 void print_ast_c::prefix_fcall(symbol_c* symbol) {print_symbol_c::print(symbol);}
 void print_ast_c::suffix_fcall(symbol_c* symbol) {}
@@ -163,12 +201,24 @@ void print_ast_c::suffix_fcall(symbol_c* symbol) {}
 
 
 
+/*********************************/
+/* The DEBUG class               */
+/*********************************/
 
 
 
 
+void debug_c::print(const char *str) {
+  fprintf(stderr, str);
+}
 
+void debug_c::print(symbol_c *symbol) {
+  print_symbol_c::print(symbol);
+}
 
+void debug_c::print_ast(symbol_c *symbol) {
+  print_ast_c::print(symbol);
+}
 
 
 
