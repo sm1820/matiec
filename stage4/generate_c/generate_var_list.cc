@@ -107,7 +107,6 @@ class search_type_symbol_c: public iterator_visitor_c {
   private:
     symbol_c *current_var_type_symbol;
     symbol_c *current_var_type_name;
-    search_base_type_c search_base_type;
     search_fb_typedecl_c *search_fb_typedecl;
 
   public:
@@ -153,7 +152,7 @@ class search_type_symbol_c: public iterator_visitor_c {
           this->current_var_type_category = function_block_vtc;
 
         else {
-          this->current_var_type_symbol = (symbol_c *)(this->current_var_type_name->accept(search_base_type));
+          this->current_var_type_symbol = search_base_type_c::get_basetype_decl(this->current_var_type_name);
           this->current_var_type_symbol->accept(*this);
         }
       }
@@ -205,7 +204,7 @@ class generate_var_list_c: protected generate_c_typedecl_c {
       external_vcc,
       located_input_vcc,
       located_memory_vcc,
-      located_output_vcc,
+      located_output_vcc
     } varclasscategory_t;
 
     varclasscategory_t current_var_class_category;
@@ -330,11 +329,14 @@ class generate_var_list_c: protected generate_c_typedecl_c {
           s4o.print(";\n");
           if (this->current_var_class_category != external_vcc) {
               SYMBOL *current_name;
+              symbol_c *tmp_var_type;
               current_name = new SYMBOL;
               current_name->symbol = symbol;
+              tmp_var_type = this->current_var_type_symbol;
               current_symbol_list.push_back(*current_name);
               this->current_var_type_symbol->accept(*this);
               current_symbol_list.pop_back();
+              this->current_var_type_symbol = tmp_var_type;
           }
           break;
         case search_type_symbol_c::array_vtc:
@@ -379,6 +381,40 @@ class generate_var_list_c: protected generate_c_typedecl_c {
         pt->symbol->accept(*this);
         s4o.print(".");
       }
+    }
+
+
+/********************************/
+/* B 1.3.3 - Derived data types */
+/********************************/
+    /*  enumerated_type_name ':' enumerated_spec_init */
+    void *visit(enumerated_type_declaration_c *symbol) {
+      this->current_var_type_name->accept(*this);
+      return NULL;
+    }
+
+    /* enumerated_specification ASSIGN enumerated_value */
+    void *visit(enumerated_spec_init_c *symbol) {
+      /* search_base_type_c now returns an enumerated_type_declaration_c as the base type of a non-anonymous enumerated type
+       * (non-anonymous means it is declared inside a TYPE ... END_TYPE declaration, with a given name/identifier
+       *  unlike implicitly defined anonymous datatypes declared inside VAR ... END_VAR declarations!).
+       * This means that this method should not get called.
+       */
+      ERROR;  
+      this->current_var_type_name->accept(*this);
+      return NULL;
+    }
+
+    /* enumerated_value_list ',' enumerated_value */
+    void *visit(enumerated_value_list_c *symbol) {
+      /* search_base_type_c now returns an enumerated_type_declaration_c as the base type of a non-anonymous enumerated type
+       * (non-anonymous means it is declared inside a TYPE ... END_TYPE declaration, with a given name/identifier
+       *  unlike implicitly defined anonymous datatypes declared inside VAR ... END_VAR declarations!).
+       * This means that this method should not get called.
+       */
+      ERROR;
+      this->current_var_type_name->accept(*this);
+      return NULL;
     }
 
 /********************************************/
@@ -555,12 +591,7 @@ class generate_var_list_c: protected generate_c_typedecl_c {
       return NULL;
     }
 
-    /* enumerated_value_list ',' enumerated_value */
-    void *visit(enumerated_value_list_c *symbol) {
-      this->current_var_type_name->accept(*this);
-      return NULL;
-    }
-    
+
     /* fb_name_list ':' function_block_type_name ASSIGN structure_initialization */
     /* structure_initialization -> may be NULL ! */
     void *visit(fb_name_decl_c *symbol) {

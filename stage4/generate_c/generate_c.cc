@@ -423,7 +423,7 @@ unsigned long long calculate_time(symbol_c *symbol) {
   };
   ERROR; // should never reach this point!
   return 0; // humour the compiler!
-};
+}
 
 /***********************************************************************/
 /***********************************************************************/
@@ -582,7 +582,7 @@ class generate_c_datatypes_c: public generate_c_typedecl_c {
     typedef enum {
       none_im,
       arrayname_im,
-      arraydeclaration_im,
+      arraydeclaration_im
     } inlinearray_mode_t;
 
   private:
@@ -1190,7 +1190,7 @@ void *visit(function_declaration_c *symbol) {
   s4o.print(" = ");
   {
     /* get the default value of this variable's type */
-    symbol_c *default_value = (symbol_c *)symbol->type_name->accept(*type_initial_value_c::instance());
+    symbol_c *default_value = type_initial_value_c::get(symbol->type_name);
     if (default_value == NULL) ERROR;
     initialization_analyzer_c initialization_analyzer(default_value);
     switch (initialization_analyzer.get_initialization_type()) {
@@ -2353,7 +2353,7 @@ class generate_c_c: public iterator_visitor_c {
     typedef enum {
       none_gm,
       datatypes_gm,
-      pous_gm,
+      pous_gm
     } generate_mode_t;
 
   protected:

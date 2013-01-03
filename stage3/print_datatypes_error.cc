@@ -103,31 +103,17 @@ int print_datatypes_error_c::get_error_count() {
 
 
 
-/* Verify if the datatypes of all prev_il_instructions are valid and equal!  */
-static bool are_all_datatypes_of_prev_il_instructions_datatypes_equal(il_instruction_c *symbol) {
-	if (NULL == symbol) ERROR;
-	bool res;
-	
-	if (symbol->prev_il_instruction.size() > 0)
-		res = is_type_valid(symbol->prev_il_instruction[0]->datatype);
+/* Verify if the datatypes of all symbols in the vector are valid and equal!  */
+static bool are_all_datatypes_equal(std::vector <symbol_c *> &symbol_vect) {
+	if (symbol_vect.size() <= 0) return false;
 
-	for (unsigned int i = 1; i < symbol->prev_il_instruction.size(); i++)
-		res &= is_type_equal(symbol->prev_il_instruction[i-1]->datatype, symbol->prev_il_instruction[i]->datatype);
-	
+	bool res = get_datatype_info_c::is_type_valid(symbol_vect[0]->datatype);
+	for (unsigned int i = 1; i < symbol_vect.size(); i++)
+		res &= get_datatype_info_c::is_type_equal(symbol_vect[i-1]->datatype, symbol_vect[i]->datatype);	
 	return res;
 }
 
 
-
-
-/* a helper function... */
-symbol_c *print_datatypes_error_c::base_type(symbol_c *symbol) {
-	/* NOTE: symbol == NULL is valid. It will occur when, for e.g., an undefined/undeclared symbolic_variable is used
-	 *       in the code.
-	 */
-	if (symbol == NULL) return NULL;
-	return (symbol_c *)symbol->accept(search_base_type);
-}
 
 
 
@@ -250,14 +236,14 @@ void print_datatypes_error_c::handle_function_invocation(symbol_c *fcall, generi
 					 */
 					for (unsigned int p = 0; p < il_instruction_symbol->prev_il_instruction.size(); p++) {
 						symbol_c *value = il_instruction_symbol->prev_il_instruction[p];  
-						if (!is_type_valid(value->datatype)) {
+						if (!get_datatype_info_c::is_type_valid(value->datatype)) {
 							function_invocation_error = true;
 							STAGE3_ERROR(0, fcall, fcall, "Data type incompatibility for value passed to first parameter when invoking function '%s'", ((identifier_c *)fcall_data.function_name)->value);
 							STAGE3_ERROR(0, value, value, "This is the IL instruction producing the incompatible data type to first parameter of function '%s'", ((identifier_c *)fcall_data.function_name)->value);
 						}
 					}
 #else
-					if (!is_type_valid(il_instruction_symbol->datatype)) {
+					if (!get_datatype_info_c::is_type_valid(il_instruction_symbol->datatype)) {
 						function_invocation_error = true;
 						STAGE3_ERROR(0, fcall, fcall, "Data type incompatibility between value in IL 'accumulator' and first parameter of function '%s'", ((identifier_c *)fcall_data.function_name)->value);
 					}
@@ -266,7 +252,7 @@ void print_datatypes_error_c::handle_function_invocation(symbol_c *fcall, generi
 						/* when handling a IL function call, and an error is found in the first parameter, then we bug out and do not print out any more error messages. */
 						return;
 				}
-				else if (!is_type_valid(param_value->datatype)) {
+				else if (!get_datatype_info_c::is_type_valid(param_value->datatype)) {
 					function_invocation_error = true;
 					STAGE3_ERROR(0, param_value, param_value, "Data type incompatibility for value passed in position %d when invoking %s '%s'", i, POU_str, ((identifier_c *)fcall_data.function_name)->value);
 				}
@@ -318,7 +304,7 @@ void *print_datatypes_error_c::handle_implicit_il_fb_invocation(const char *para
 		STAGE3_ERROR(0, il_operator, il_operand, "FB called by '%s' operator does not have a parameter named '%s'", param_name, param_name);	
 		return NULL;
 	}
-	if (!are_all_datatypes_of_prev_il_instructions_datatypes_equal(fake_prev_il_instruction)) {
+	if (!are_all_datatypes_equal(fake_prev_il_instruction->prev_il_instruction)) {
 		STAGE3_ERROR(0, il_operator, il_operand, "Data type incompatibility between parameter '%s' and value being passed.", param_name);
 		return NULL;
 	}
@@ -412,7 +398,7 @@ void *print_datatypes_error_c::visit(hex_integer_c *symbol) {
 
 void *print_datatypes_error_c::visit(integer_literal_c *symbol) {
 	if (symbol->candidate_datatypes.size() == 0) {
-		STAGE3_ERROR(0, symbol, symbol, "Numerical value exceeds range for %s data type.", elementary_type_c::to_string(symbol->type));
+		STAGE3_ERROR(0, symbol, symbol, "Numerical value exceeds range for %s data type.", get_datatype_info_c::get_id_str(symbol->type));
 	} else if (NULL == symbol->datatype) {
 		STAGE3_ERROR(4, symbol, symbol, "ANY_INT data type not valid in this location.");
 	}
@@ -421,7 +407,7 @@ void *print_datatypes_error_c::visit(integer_literal_c *symbol) {
 
 void *print_datatypes_error_c::visit(real_literal_c *symbol) {
 	if (symbol->candidate_datatypes.size() == 0) {
-		STAGE3_ERROR(0, symbol, symbol, "Numerical value exceeds range for %s data type.", elementary_type_c::to_string(symbol->type));
+		STAGE3_ERROR(0, symbol, symbol, "Numerical value exceeds range for %s data type.", get_datatype_info_c::get_id_str(symbol->type));
 	} else if (NULL == symbol->datatype) {
 		STAGE3_ERROR(4, symbol, symbol, "ANY_REAL data type not valid in this location.");
 	}
@@ -430,7 +416,7 @@ void *print_datatypes_error_c::visit(real_literal_c *symbol) {
 
 void *print_datatypes_error_c::visit(bit_string_literal_c *symbol) {
 	if (symbol->candidate_datatypes.size() == 0) {
-		STAGE3_ERROR(0, symbol, symbol, "Numerical value exceeds range for %s data type.", elementary_type_c::to_string(symbol->type));
+		STAGE3_ERROR(0, symbol, symbol, "Numerical value exceeds range for %s data type.", get_datatype_info_c::get_id_str(symbol->type));
 	} else if (NULL == symbol->datatype) {
 		STAGE3_ERROR(4, symbol, symbol, "ANY_BIT data type not valid in this location.");
 	}
@@ -439,7 +425,7 @@ void *print_datatypes_error_c::visit(bit_string_literal_c *symbol) {
 
 void *print_datatypes_error_c::visit(boolean_literal_c *symbol) {
 	if (symbol->candidate_datatypes.size() == 0) {
-		STAGE3_ERROR(0, symbol, symbol, "Value is not valid for %s data type.", elementary_type_c::to_string(symbol->type));
+		STAGE3_ERROR(0, symbol, symbol, "Value is not valid for %s data type.", get_datatype_info_c::get_id_str(symbol->type));
 	} else if (NULL == symbol->datatype) {
 		STAGE3_ERROR(4, symbol, symbol, "ANY_BOOL data type not valid in this location.");
 	}
@@ -537,12 +523,12 @@ void *print_datatypes_error_c::visit(date_and_time_c *symbol) {
 /* B 1.3.3 - Derived data types */
 /********************************/
 void *print_datatypes_error_c::visit(simple_spec_init_c *symbol) {
-	if (!is_type_valid(symbol->simple_specification->datatype)) {
+	if (!get_datatype_info_c::is_type_valid(symbol->simple_specification->datatype)) {
 		STAGE3_ERROR(0, symbol->simple_specification, symbol->simple_specification, "Invalid data type.");
 	} else if (NULL != symbol->constant) {
-		if (!is_type_valid(symbol->constant->datatype))
+		if (!get_datatype_info_c::is_type_valid(symbol->constant->datatype))
 			STAGE3_ERROR(0, symbol->constant, symbol->constant, "Initial value has incompatible data type.");
-	} else if (!is_type_valid(symbol->datatype)) {
+	} else if (!get_datatype_info_c::is_type_valid(symbol->datatype)) {
 		ERROR; /* If we have an error here, then we must also have an error in one of
 		        * the two previous tests. If we reach this point, some strange error is ocurring!
 			*/
@@ -550,11 +536,6 @@ void *print_datatypes_error_c::visit(simple_spec_init_c *symbol) {
 	return NULL;
 }
 
-void *print_datatypes_error_c::visit(data_type_declaration_c *symbol) {
-	// TODO !!!
-	/* for the moment we must return NULL so semantic analysis of remaining code is not interrupted! */
-	return NULL;
-}
 
 void *print_datatypes_error_c::visit(enumerated_value_c *symbol) {
 	if (symbol->candidate_datatypes.size() == 0)
@@ -577,7 +558,7 @@ void *print_datatypes_error_c::visit(symbolic_variable_c *symbol) {
 /********************************************/
 void *print_datatypes_error_c::visit(direct_variable_c *symbol) {
 	if (symbol->candidate_datatypes.size() == 0) ERROR;
-	if (!is_type_valid(symbol->datatype))
+	if (!get_datatype_info_c::is_type_valid(symbol->datatype))
 		STAGE3_ERROR(4, symbol, symbol, "Direct variable has incompatible data type with expression.");
 	return NULL;
 }
@@ -648,7 +629,7 @@ void *print_datatypes_error_c::visit(located_var_decl_c *symbol) {
   symbol->located_var_spec_init->accept(*this);
   /* It does not make sense to call symbol->location->accept(*this). The check is done right here if the following if() */
   // symbol->location->accept(*this); 
-  if ((is_type_valid(symbol->located_var_spec_init->datatype)) && (!is_type_valid(symbol->location->datatype)))
+  if ((get_datatype_info_c::is_type_valid(symbol->located_var_spec_init->datatype)) && (!get_datatype_info_c::is_type_valid(symbol->location->datatype)))
     STAGE3_ERROR(0, symbol, symbol, "Bit size of data type is incompatible with bit size of location.");
   return NULL;
 }  
@@ -662,8 +643,7 @@ void *print_datatypes_error_c::visit(located_var_decl_c *symbol) {
 /*********************/
 void *print_datatypes_error_c::visit(function_declaration_c *symbol) {
 	search_varfb_instance_type = new search_varfb_instance_type_c(symbol);
-	/* We do not check for data type errors in variable declarations, Skip this for now... */
-// 	symbol->var_declarations_list->accept(*this);
+ 	symbol->var_declarations_list->accept(*this);
 	if (debug) printf("Print error data types list in body of function %s\n", ((token_c *)(symbol->derived_function_name))->value);
 	il_parenthesis_level = 0;
 	il_error = false;
@@ -678,8 +658,7 @@ void *print_datatypes_error_c::visit(function_declaration_c *symbol) {
 /***************************/
 void *print_datatypes_error_c::visit(function_block_declaration_c *symbol) {
 	search_varfb_instance_type = new search_varfb_instance_type_c(symbol);
-	/* We do not check for data type errors in variable declarations, Skip this for now... */
-// 	symbol->var_declarations->accept(*this);
+ 	symbol->var_declarations->accept(*this);
 	if (debug) printf("Print error data types list in body of FB %s\n", ((token_c *)(symbol->fblock_name))->value);
 	il_parenthesis_level = 0;
 	il_error = false;
@@ -694,7 +673,6 @@ void *print_datatypes_error_c::visit(function_block_declaration_c *symbol) {
 /**********************/
 void *print_datatypes_error_c::visit(program_declaration_c *symbol) {
 	search_varfb_instance_type = new search_varfb_instance_type_c(symbol);
-	/* We do not check for data type errors in variable declarations, Skip this for now... */
 	symbol->var_declarations->accept(*this);
 	if (debug) printf("Print error data types list in body of program %s\n", ((token_c *)(symbol->program_type_name))->value);
 	il_parenthesis_level = 0;
@@ -762,7 +740,7 @@ void *print_datatypes_error_c::visit(il_instruction_c *symbol) {
 		 */
 		tmp_prev_il_instruction.prev_il_instruction = symbol->prev_il_instruction;
 		intersect_prev_candidate_datatype_lists(&tmp_prev_il_instruction);
-		if (are_all_datatypes_of_prev_il_instructions_datatypes_equal(symbol))
+		if (are_all_datatypes_equal(symbol->prev_il_instruction))
 			if (symbol->prev_il_instruction.size() > 0)
 				tmp_prev_il_instruction.datatype = (symbol->prev_il_instruction[0])->datatype;
 		
@@ -835,6 +813,8 @@ void *print_datatypes_error_c::visit(il_function_call_c *symbol) {
 /* | il_expr_operator '(' [il_operand] eol_list [simple_instr_list] ')' */
 // SYM_REF3(il_expression_c, il_expr_operator, il_operand, simple_instr_list);
 void *print_datatypes_error_c::visit(il_expression_c *symbol) {
+  /* Stage2 will insert an artificial (and equivalent) LD <il_operand> to the simple_instr_list if necessary. We can therefore ignore the 'il_operand' entry! */
+  
   /* first give the parenthesised IL list a chance to print errors */
   il_instruction_c *save_fake_prev_il_instruction = fake_prev_il_instruction;
   symbol->simple_instr_list->accept(*this);
@@ -902,6 +882,7 @@ void *print_datatypes_error_c::visit(il_simple_instruction_c *symbol)	{
   if (symbol->prev_il_instruction.size() > 1) ERROR; /* There should be no labeled insructions inside an IL expression! */
     
   il_instruction_c tmp_prev_il_instruction(NULL, NULL);
+#if 0
   /* the print error algorithm will need access to the intersected candidate_datatype lists of all prev_il_instructions, as well as the 
    * list of the prev_il_instructions.
    * Instead of creating two 'global' (within the class) variables, we create a single il_instruction_c variable (fake_prev_il_instruction),
@@ -910,6 +891,19 @@ void *print_datatypes_error_c::visit(il_simple_instruction_c *symbol)	{
   if (symbol->prev_il_instruction.size() > 0)
     tmp_prev_il_instruction.candidate_datatypes = symbol->prev_il_instruction[0]->candidate_datatypes;
   tmp_prev_il_instruction.prev_il_instruction = symbol->prev_il_instruction;
+#endif
+  
+  /* the print error algorithm will need access to the intersected candidate_datatype lists of all prev_il_instructions, as well as the 
+   * list of the prev_il_instructions.
+   * Instead of creating two 'global' (within the class) variables, we create a single il_instruction_c variable (fake_prev_il_instruction),
+   * and shove that data into this single variable.
+   */
+  tmp_prev_il_instruction.prev_il_instruction = symbol->prev_il_instruction;
+  intersect_prev_candidate_datatype_lists(&tmp_prev_il_instruction);
+  if (are_all_datatypes_equal(symbol->prev_il_instruction))
+    if (symbol->prev_il_instruction.size() > 0)
+      tmp_prev_il_instruction.datatype = (symbol->prev_il_instruction[0])->datatype;
+  
   
    /* copy the candidate_datatypes list */
   fake_prev_il_instruction = &tmp_prev_il_instruction;
@@ -1264,7 +1258,7 @@ void *print_datatypes_error_c::visit(for_statement_c *symbol) {
 
 void *print_datatypes_error_c::visit(while_statement_c *symbol) {
 	symbol->expression->accept(*this);
-	if (!is_type_valid(symbol->expression->datatype)) {
+	if (!get_datatype_info_c::is_type_valid(symbol->expression->datatype)) {
 		STAGE3_ERROR(0, symbol, symbol, "Invalid data type for 'WHILE' condition.");
 		return NULL;
 	}
@@ -1274,7 +1268,7 @@ void *print_datatypes_error_c::visit(while_statement_c *symbol) {
 }
 
 void *print_datatypes_error_c::visit(repeat_statement_c *symbol) {
-	if (!is_type_valid(symbol->expression->datatype)) {
+	if (!get_datatype_info_c::is_type_valid(symbol->expression->datatype)) {
 		STAGE3_ERROR(0, symbol, symbol, "Invalid data type for 'REPEAT' condition.");
 		return NULL;
 	}

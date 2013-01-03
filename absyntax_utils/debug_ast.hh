@@ -1,6 +1,5 @@
 /*
  *  matiec - a compiler for the programming languages defined in IEC 61131-3
- *
  *  Copyright (C) 2003-2011  Mario de Sousa (msousa@fe.up.pt)
  *  Copyright (C) 2007-2011  Laurent Bessard and Edouard Tisserant
  *
@@ -30,30 +29,44 @@
  *
  */
 
-/* Returns the data type of an il_operand.
+
+/*
+ * Some classes to help with debuging.
  *
- * Note that the il_operand may be a variable, in which case
- * we return the type of the variable instance.
- * The il_operand may also be a constant, in which case
- * we return the data type of that constant.
- *
- * The variable instance may be a member of a structured variable,
- * or an element in an array, or any combination of the two.
- *
- * The class constructor must be given the search scope
- * (function, function block or program within which
- * the possible il_operand variable instance was declared).
+ * These classes will print out the current state of a symbol or a portion of the Abstract Syntax Tree.
  */
 
-class search_il_operand_type_c {
 
-  private:
-    search_varfb_instance_type_c search_varfb_instance_type;
-    search_constant_type_c search_constant_type;
 
+
+
+
+#include "../absyntax/absyntax.hh"
+
+
+class debug_c { 
   public:
-    search_il_operand_type_c(symbol_c *search_scope): search_varfb_instance_type(search_scope) {}
+    static void print(symbol_c *symbol);
+    static void print(const char *str);
 
-  public:
-    symbol_c *get_type(symbol_c *il_operand);
+    /* print the AST from this point downwards */
+    static void print_ast(symbol_c *root_symbol);
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

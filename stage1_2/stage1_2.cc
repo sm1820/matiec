@@ -46,34 +46,29 @@
 #include "stage1_2.hh"
 #include "iec_bison.h"
 #include "stage1_2_priv.hh"
+#include "create_enumtype_conversion_functions.hh"
 
 
 
 
-
-/**************************************/
-/* The name of the file being parsed. */
-/**************************************/
-/* The name of the file currently being parsed...
- * Note that flex accesses and updates this global variable
- * apropriately whenever it comes across an (*#include <filename> *)
- * directive...
- * ... and bison will use it when producing error messages.
- * Note that bison also sets this variable correctly to the first
- * file being parsed.
- */
-const char *current_filename = NULL;
 
 
 /******************************************************/
-/* whether we are suporting safe extensions           */
+/* whether we are supporting safe extensions          */
 /* as defined in PLCopen - Technical Committee 5      */
 /* Safety Software Technical Specification,           */
 /* Part 1: Concepts and Function Blocks,              */
-/* Version 1.0 – Official Release                     */
+/* Version 1.0 – Official Release                   */
 /******************************************************/
 bool safe_extensions_ = false;
 bool get_opt_safe_extensions() {return safe_extensions_;}
+
+/******************************************************/
+/* whether we are supporting conversion functions     */
+/* for enumerate data types                           */
+/******************************************************/
+bool conversion_functions_ = false;
+
 
 /****************************************************/
 /* Controlling the entry to the body_state in flex. */
@@ -213,59 +208,7 @@ char *strdup3(const char *a, const char *b, const char *c) {
   return strcat(strcat(strcpy(res, a), b), c);  /* safe, actually */
 }
 
-/*************************/
-/* Tracking Functions... */
-/*************************/
 
-extern tracking_t* current_tracking;
-
-/*--------------------------------------------------------------------
- * GetNextChar
- * 
- * reads a character from input for flex
- *------------------------------------------------------------------*/
-int GetNextChar(char *b, int maxBuffer) {
-  char *p;
-  
-  if (  current_tracking->eof  )
-    return 0;
-  
-  while (  current_tracking->currentChar >= current_tracking->lineLength  ) {
-    current_tracking->currentChar = 0;
-    current_tracking->currentTokenStart = 1;
-    current_tracking->eof = false;
-    
-    p = fgets(current_tracking->buffer, MAX_BUFFER_LENGTH, current_tracking->in_file);
-    if (  p == NULL  ) {
-      if (  ferror(current_tracking->in_file)  )
-        return 0;
-      current_tracking->eof = true;
-      return 0;
-    }
-    
-    current_tracking->lineNumber++;
-    current_tracking->lineLength = strlen(current_tracking->buffer);
-  }
-  
-  b[0] = current_tracking->buffer[current_tracking->currentChar];
-  if (b[0] == ' ' || b[0] == '\t')
-    current_tracking->currentTokenStart++;
-  current_tracking->currentChar++;
-
-  return b[0]==0?0:1;
-}
-
-tracking_t* GetNewTracking(FILE* in_file) {
-  tracking_t* new_env = new tracking_t;
-  new_env->eof = 0;
-  new_env->lineNumber = 0;
-  new_env->currentChar = 0;
-  new_env->lineLength = 0;
-  new_env->currentTokenStart = 0;
-  new_env->buffer = (char*)malloc(MAX_BUFFER_LENGTH);
-  new_env->in_file = in_file;
-  return new_env;
-}
 
 /***********************************************************************/
 /***********************************************************************/
@@ -297,8 +240,9 @@ int stage1_2(const char *filename, symbol_c **tree_root_ref, stage1_2_options_t 
        *       These callback functions will get their data from local (to this file) global variables...
        *       We now set those variables...
        */
+
   safe_extensions_ = options.safe_extensions;
-  
+  conversion_functions_ = options.conversion_functions;
   return stage2__(filename, options.includedir, tree_root_ref, options.full_token_loc);
 }
 

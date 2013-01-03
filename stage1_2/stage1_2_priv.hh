@@ -105,35 +105,33 @@ bool get_opt_safe_extensions();
 /* This is a service that flex provides to bison... */
 void print_include_stack(void);
 
-
-/**************************************/
-/* The name of the file being parsed. */
-/**************************************/
-/* The name of the file currently being parsed...
- * Note that flex accesses and updates this global variable
- * apropriately whenever it comes across an (*#include <filename> *)
- * directive...
- * ... and bison will use it when producing error messages.
- * Note that bison also sets this variable correctly to the first
- * file being parsed.
+/*****************************************************/
+/* Ask flex to include the source code in the string */
+/*****************************************************/
+/* This is a service that flex provides to bison... */
+/* The string should contain valid IEC 61131-3 source code. Bison will ask flex to insert source 
+ * code into the input stream of IEC code being parsed. The code to be inserted is typically
+ * generated automatically.
+ * Currently this is used to insert conversion functions ***_TO_*** (as defined by the standard)
+ * between user defined (i.e. derived) enumerated datatypes, and some basic datatypes 
+ * (e.g. INT, STRING, etc...)
  */
-extern const char *current_filename;
+void include_string(const char *source_code);
 
 
-#define MAX_BUFFER_LENGTH 1000
+/**********************************/
+/* Tell flex which file to parse. */
+/**********************************/
+/* This is a service that flex provides to bison... */
+/* Tell flex which file to parse. This function will not imediately start parsing the file.
+ * To parse the file, you then need to call yyparse()
+ *
+ * Returns NULL on error opening the file (and a valid errno), or 0 on success.
+ * Caller must close the file!
+ */
+FILE *parse_file(const char *filename);
 
-typedef struct {
-    int eof;
-    int lineNumber;
-    int currentChar;
-    int lineLength;
-    int currentTokenStart;
-    char* buffer;
-    FILE *in_file;
-  } tracking_t;
 
-int GetNextChar(char *b, int maxBuffer);
-tracking_t* GetNewTracking(FILE* in_file);
 
 /****************************************************/
 /* Controlling the entry to the body_state in flex. */

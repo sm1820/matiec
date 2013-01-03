@@ -100,7 +100,7 @@ void yyerror (const char *error_msg);
 
 /* The interface through which bison and flex interact. */
 #include "stage1_2_priv.hh"
-
+#include "create_enumtype_conversion_functions.hh"
 
 #include "../absyntax_utils/add_en_eno_param_decl.hh"	/* required for  add_en_eno_param_decl_c */
 
@@ -203,6 +203,11 @@ extern bool allow_extensible_function_parameters;
  */
 extern bool full_token_loc;
 
+/* A global flag used to tell the parser whether to generate conversion function
+ * for enumerated data types.
+ */
+extern bool conversion_functions_;
+
 /* A pointer to the root of the parsing tree that will be generated 
  * by bison.
  */
@@ -232,7 +237,7 @@ void print_err_msg(int first_line,
                    int last_column,
                    const char *last_filename,
                    long int last_order,
-                   const char *additional_error_msg);
+                   const char *additional_error_msg);    
 %}
 
 
@@ -433,7 +438,7 @@ typedef struct YYLTYPE {
 /* B 1.2 - Constants */
 /*********************/
 %type <leaf>	constant
-%type <leaf>	non_negative_constant
+%type <leaf>	non_int_or_real_constant
 
 /******************************/
 /* B 1.2.1 - Numeric Literals */
@@ -1299,7 +1304,7 @@ typedef struct YYLTYPE {
 %type  <leaf>	unary_expression
 // %type  <leaf>	unary_operator
 %type  <leaf>	primary_expression
-%type  <leaf>	non_negative_primary_expression
+%type  <leaf>	non_int_or_real_primary_expression
 /* intermediate helper symbol for primary_expression */
 %type  <leaf>	function_invocation
 
@@ -1730,91 +1735,64 @@ identifier:
 /* B 1.2 - Constants */
 /*********************/
 constant:
-  numeric_literal
-| character_string
+  character_string
 | time_literal
 | bit_string_literal
 | boolean_literal
+| numeric_literal  
+/* NOTE: Our definition of numeric_literal is diferent than the one in the standard.
+ *       We will now add what is missing in our definition of numeric literal, so our
+ *       definition of constant matches what the definition of constant in the standard.
+ */
 /* NOTE: in order to remove reduce/reduce conflicts,
  * [between -9.5 being parsed as 
  *     (i)   a signed real, 
  *     (ii)  or as a real preceded by the '-' operator
  *  ]
  *  we need to define a variant of the constant construct
- *  where any constant is never preceded by the '-' character.
- * In order to do this, we have borugh the signed_real 
- * directly into the definition of the constant construct
- * (so we can define another non_negative_constant
- * construct that does not include it!)
+ *  where any real or integer constant is always preceded by 
+ *  a sign (i.e. the '-' or '+' characters).
+ *  (For more info, see comment in the construct non_int_or_real_primary_expression)
+ *
+ * For the above reason, our definition of the numeric_literal construct
+ * is missing the integer and real constrcuts (when not preceded by a sign)
+ * so we add then here explicitly!
  */
-| signed_real
-/* NOTE: in order to remove reduce/reduce conflicts,
- * unsigned_integer, signed_integer, binary_integer, octal_integer
- * and hex_integer have been integrated directly into
- * the constants construct, instead of belonging to
- * both the bit_string_literal or integer_literal
- * construct.
- */
+| real
+| integer
 /* NOTE: unsigned_integer, although used in some
  * rules, is not defined in the spec!
  * We therefore replaced unsigned_integer as integer
  */
-/*| integer {} */  /* i.e. an unsigned_integer */ /* NOTE: already included as a signed integer! */
-| signed_integer
-| binary_integer
-| octal_integer
-| hex_integer
 ;
 
 
-/* NOTE: in order to remove reduce/reduce conflicts,
- * [between -9.5 being parsed as 
- *     (i)   a signed real, 
- *     (ii)  or as a real preceded by the '-' operator
- *  ]
- *  we need to define a variant of the constant construct
- *  where any constant is never preceded by the '-' character.
- * In order to do this, we have borugh the signed_real 
- * directly into the definition of the constant construct
- * (so we can define another non_negative_constant
- * construct that does not include it!)
- */
-non_negative_constant:
-  numeric_literal
-| character_string
+
+
+non_int_or_real_constant:
+  character_string
 | time_literal
 | bit_string_literal
 | boolean_literal
+| numeric_literal  
+/* NOTE: Our definition of numeric_literal is diferent than the one in the standard.
+ *       It is missing the integer and real when not prefixed by a sign 
+ *       (i.e. -54, +42 is included in numerical_literal,
+ *        but   54,  42 is not parsed as a numeric_literal!!)
+ */
 /* NOTE: in order to remove reduce/reduce conflicts,
  * [between -9.5 being parsed as 
  *     (i)   a signed real, 
  *     (ii)  or as a real preceded by the '-' operator
  *  ]
+ * [and a similar situation for integers!]
  *  we need to define a variant of the constant construct
- *  where any constant is never preceded by the '-' character.
- * In order to do this, we have borugh the signed_real 
- * directly into the definition of the constant construct
- * (so we can define another non_negative_constant
- * construct that does not include it!)
+ *  where any real or integer constant is always preceded by 
+ *  a sign (i.e. the '-' or '+' characters).
+ *
+ * For the above reason, our definition of the numeric_literal construct
+ * is missing the integer and real constrcuts (when not preceded by a sign)
  */
-/* | signed_real */
-| real /* an unsigned real */
-/* NOTE: in order to remove reduce/reduce conflicts,
- * unsigned_integer, signed_integer, binary_integer, octal_integer
- * and hex_integer have been integrated directly into
- * the constants construct, instead of belonging to
- * both the bit_string_literal or integer_literal
- * construct.
- */
-/* NOTE: unsigned_integer, although used in some
- * rules, is not defined in the spec!
- * We therefore replaced unsigned_integer as integer
- */
-| integer  /* i.e. an unsigned_integer */
-/* | signed_integer */
-| binary_integer
-| octal_integer
-| hex_integer
 ;
 
 
@@ -1916,10 +1894,13 @@ integer_literal:
 	{$$ = new integer_literal_c($1, $3, locloc(@$));}
 | integer_type_name '#' hex_integer
 	{$$ = new integer_literal_c($1, $3, locloc(@$));}
-/* NOTE: see note in the definition of constant for reason
- * why signed_integer, binary_integer, octal_integer
- * and hex_integer are missing here!
- */
+| binary_integer
+| octal_integer
+| hex_integer
+//|signed_integer  /* We expand the construct signed_integer here, so we can remove one of its constituents */
+//|  integer       /* REMOVED! see note in the definition of constant for reason why integer is missing here! */
+| '+' integer   {$$ = $2;}
+| '-' integer	{$$ = new neg_integer_c($2, locloc(@$));}
 /* ERROR_CHECK_BEGIN */
 | integer_type_name signed_integer
 	{$$ = NULL; print_err_msg(locl(@1), locf(@2), "'#' missing between integer type name and value in integer literal."); yynerrs++;}
@@ -1938,6 +1919,13 @@ integer_literal:
 /* ERROR_CHECK_END */
 ;
 
+/* NOTE: this construct is used in the definition of integer_literal. However, in order to remove
+ *       a reduce/reduce conflict (see NOTE in definition of constant for reason why)
+ *       it is not used directly, but rather its expansion is copied there.
+ *
+ *       If for some reason you need to change the definition of signed_integer, don't forget
+ *       to change its expansion in integer_literal too!
+*/
 signed_integer:
   integer
 | '+' integer   {$$ = $2;}
@@ -1946,11 +1934,11 @@ signed_integer:
 
 
 real_literal:
-/* NOTE: see note in the definition of constant for reason
- * why signed_real is missing here!
- */
-/*  signed_real */
-  real_type_name '#' signed_real
+// signed_real /* We expand the construct signed_integer here, so we can remove one of its constituents */
+// real        /* REMOVED! see note in the definition of constant for reason why real is missing here! */
+  '+' real	{$$ = $2;}
+| '-' real	{$$ = new neg_real_c($2, locloc(@2));}
+| real_type_name '#' signed_real
 	{$$ = new real_literal_c($1, $3, locloc(@$));}
 /* ERROR_CHECK_BEGIN */
 | real_type_name signed_real
@@ -1964,13 +1952,18 @@ real_literal:
 /* ERROR_CHECK_END */
 ;
 
-
+/* NOTE: this construct is used in the definition of real_literal. However, in order to remove
+ *       a reduce/reduce conflict (see NOTE in definition of constant for reason why)
+ *       it is not used directly, but rather its expansion is copied there.
+ *
+ *       If for some reason you need to change the definition of signed_real, don't forget
+ *       to change its expansion in real_literal too!
+*/
 signed_real:
   real
 | '+' real	{$$ = $2;}
 | '-' real	{$$ = new neg_real_c($2, locloc(@2));}
 ;
-
 
 
 bit_string_literal:
@@ -2513,7 +2506,7 @@ structure_type_name: identifier;
 
 data_type_declaration:
   TYPE type_declaration_list END_TYPE
-	{$$ = new data_type_declaration_c($2, locloc(@$));}
+	{$$ = new data_type_declaration_c($2, locloc(@$)); if (conversion_functions_) include_string((create_enumtype_conversion_functions_c::get_declaration($$)).c_str());}
 /* ERROR_CHECK_BEGIN */
 | TYPE END_TYPE
 	{$$ = NULL; print_err_msg(locl(@1), locf(@2), "no data type declared in data type(s) declaration."); yynerrs++;}
@@ -2561,10 +2554,13 @@ single_element_type_declaration:
 
 simple_type_declaration:
 /*  simple_type_name ':' simple_spec_init */
-  identifier ':' simple_spec_init
-	{$$ = new simple_type_declaration_c($1, $3, locloc(@$));
-	 library_element_symtable.insert($1, prev_declared_simple_type_name_token);
-	}
+/* To understand why simple_spec_init was brocken up into its consituent components in the following rules, please see note in the definition of 'enumerated_type_declaration'. */
+  identifier ':' simple_specification           {library_element_symtable.insert($1, prev_declared_simple_type_name_token);}
+	{$$ = new simple_type_declaration_c($1, $3, locloc(@$));}
+| identifier ':' elementary_type_name           {library_element_symtable.insert($1, prev_declared_simple_type_name_token);} ASSIGN constant
+	{$$ = new simple_type_declaration_c($1, new simple_spec_init_c($3, $6, locf(@3), locl(@6)), locloc(@$));}
+| identifier ':' prev_declared_simple_type_name {library_element_symtable.insert($1, prev_declared_simple_type_name_token);} ASSIGN constant
+	{$$ = new simple_type_declaration_c($1, new simple_spec_init_c($3, $6, locf(@3), locl(@6)), locloc(@$));}
 /* ERROR_CHECK_BEGIN */
 | error ':' simple_spec_init
 	{$$ = NULL; print_err_msg(locf(@1), locl(@1), "invalid name defined for data type declaration.");yyerrok;}
@@ -2699,10 +2695,23 @@ subrange:
 
 enumerated_type_declaration:
 /*  enumerated_type_name ':' enumerated_spec_init */
-  identifier ':' enumerated_spec_init
-	{$$ = new enumerated_type_declaration_c($1, $3, locloc(@$));
-	 library_element_symtable.insert($1, prev_declared_enumerated_type_name_token);
-	}
+/* NOTE: The 'identifier' used for the name of the new enumerated type is inserted early into the library_element_symtable so it may be used
+ *       in defining the default initial value of this type, using the fully qualified enumerated constant syntax: type_name#enum_value
+ *       In other words, this allows us to correclty parse the following IEC 61131-3 code:
+ *           TYPE enum_t : (x1, x2, x3) := enum_t#x3; END_TYPE
+ *                                         ^^^^^^^
+ *
+ *       However, we can only introduce it after we are sure we are parsing an enumerated_spec. For this reason, instead of using the
+ *       symbol enumerated_spec_init in this rule, we decompose it here instead!
+ *       
+ *       If it were not for the above, we could use the rule
+ *           identifier ':' enumerated_spec_init
+ *       and include the library_element_symtable.insert(...) code in the rule actions!
+ */
+  identifier ':' enumerated_specification {library_element_symtable.insert($1, prev_declared_enumerated_type_name_token);}
+	{$$ = new enumerated_type_declaration_c($1, new enumerated_spec_init_c($3, NULL, locloc(@3)), locloc(@$));}
+| identifier ':' enumerated_specification {library_element_symtable.insert($1, prev_declared_enumerated_type_name_token);} ASSIGN enumerated_value
+	{$$ = new enumerated_type_declaration_c($1, new enumerated_spec_init_c($3, $6, locf(@3), locl(@6)), locloc(@$));}
 /* ERROR_CHECK_BEGIN */
 | error ':' enumerated_spec_init
 	{$$ = NULL; print_err_msg(locf(@1), locl(@1), "invalid name defined for enumerated type declaration."); yyerrok;}
@@ -6378,6 +6387,26 @@ il_simple_operation:
 
 il_expression:
 // il_expr_operator '(' [il_operand] EOL {EOL} [simple_instr_list] ')'
+/* IMPORTANT NOTE:
+ *  When the <il_operand> exists, and to make it easier to handle the <il_operand> as a general case (i.e. without C++ code handling this as a special case), 
+ *  we will create an equivalent LD <il_operand> IL instruction, and prepend it into the <simple_instr_list>. 
+ *  The remainder of the compiler may from now on assume that the code being compiled does not contain any IL code like
+ *     LD 1
+ *     ADD ( 2
+ *        SUB 3
+ *        )
+ *
+ * but instead, the equivalent code
+ *     LD 1
+ *     ADD ( 
+ *        LD  2
+ *        SUB 3
+ *        )
+ *
+ * Note, however, that in the first case, we still store in the il_expression_c a pointer to the <il_operand> (the literal '2' in the above example), in case
+ * somewhere further on in the compiler we really want to handle it as a special case. To handle it as a special case, it should be easy to simply delete the first
+ * artificial entry in <simple_instr_list> with il_expression->simple_instr_list->remove_element(0)  !!
+ */
 /*
  * Note: Bison is getting confused with the use of il_expr_operator,
  *       i.e. it is finding conflicts where there seemingly are really none.
@@ -6387,17 +6416,29 @@ il_expression:
   il_expr_operator_noclash '(' eol_list ')'
 	{$$ = new il_expression_c($1, NULL, NULL, locloc(@$));}
 | il_expr_operator_noclash '(' il_operand eol_list ')'
-	{$$ = new il_expression_c($1, $3, NULL, locloc(@$));}
+	{ simple_instr_list_c *tmp_simple_instr_list = new simple_instr_list_c(locloc(@3));
+	  tmp_simple_instr_list ->insert_element(new il_simple_instruction_c(new il_simple_operation_c(new LD_operator_c(locloc(@3)), $3, locloc(@3)), locloc(@3)), 0);
+	  $$ = new il_expression_c($1, $3, tmp_simple_instr_list, locloc(@$));
+	}
 | il_expr_operator_noclash '(' eol_list simple_instr_list ')'
 	{$$ = new il_expression_c($1, NULL, $4, locloc(@$));}
 | il_expr_operator_noclash '(' il_operand eol_list simple_instr_list ')'
-	{$$ = new il_expression_c($1, $3, $5, locloc(@$));}
+	{ simple_instr_list_c *tmp_simple_instr_list = dynamic_cast <simple_instr_list_c *> $5;
+	  tmp_simple_instr_list ->insert_element(new il_simple_instruction_c(new il_simple_operation_c(new LD_operator_c(locloc(@3)), $3, locloc(@3)), locloc(@3)), 0);
+	  $$ = new il_expression_c($1, $3, $5, locloc(@$));
+	}
 | il_expr_operator_clash '(' eol_list ')'
 	{$$ = new il_expression_c($1, NULL, NULL, locloc(@$));}
 | il_expr_operator_clash '(' il_operand eol_list ')'
-	{$$ = new il_expression_c($1, $3, NULL, locloc(@$));}
+	{ simple_instr_list_c *tmp_simple_instr_list = new simple_instr_list_c(locloc(@3));
+	  tmp_simple_instr_list ->insert_element(new il_simple_instruction_c(new il_simple_operation_c(new LD_operator_c(locloc(@3)), $3, locloc(@3)), locloc(@3)), 0);
+	  $$ = new il_expression_c($1, $3, tmp_simple_instr_list, locloc(@$));
+	}
 | il_expr_operator_clash '(' il_operand eol_list simple_instr_list ')'
-	{$$ = new il_expression_c($1, $3, $5, locloc(@$));}
+	{ simple_instr_list_c *tmp_simple_instr_list = dynamic_cast <simple_instr_list_c *> $5;
+	  tmp_simple_instr_list ->insert_element(new il_simple_instruction_c(new il_simple_operation_c(new LD_operator_c(locloc(@3)), $3, locloc(@3)), locloc(@3)), 0);
+	  $$ = new il_expression_c($1, $3, $5, locloc(@$));
+	}
 | il_expr_operator_clash_eol_list simple_instr_list ')'
 	{$$ = new il_expression_c($1, NULL, $2, locloc(@$));}
 /* ERROR_CHECK_BEGIN */
@@ -7201,8 +7242,8 @@ power_expression:
 
 
 unary_expression:
-  non_negative_primary_expression
-| '-' non_negative_primary_expression
+  primary_expression
+| '-' non_int_or_real_primary_expression
 	{$$ = new neg_expression_c($2, locloc(@$));}
 | NOT primary_expression
 	{$$ = new not_expression_c($2, locloc(@$));}
@@ -7238,8 +7279,34 @@ unary_operator: '-' | 'NOT'
  *       (i.e. the constant 9, preceded by a unary negation)
  *
  *       To remove the conflict, we only allow constants without
- *       a preceding '-' to be used in primary_expression
+ *       integer or reals that are not preceded by a sign 
+ *       (i.e. a '-' or '+' character) to be used in primary_expression
  *       (i.e. as a parameter to the unary negation operator)
+ *
+ *       e.g.  '-42', '+54', '42', '54' are all allowed in primary expression
+ *       according to the standard. However, we will allow only '-42' and '+54'
+ *       to be used as an argument to the negation operator ('-').
+ */
+/* NOTE: Notice that the standard considers the following syntax correct:
+ *         VAR intv: INT; END_VAR
+ *         intv :=      42;         <----- OK
+ *         intv :=     -42;         <----- OK
+ *         intv :=     +42;         <----- OK
+ *         intv :=    --42;         <----- OK!!
+ *         intv :=    -+42;         <----- OK!!
+ *         intv :=  -(--42);        <----- OK!!
+ *         intv :=  -(-+42);        <----- OK!!
+ *         intv :=-(-(--42));       <----- OK!!
+ *         intv :=-(-(-+42));       <----- OK!!
+ *     but does NOT allow the following syntax:
+ *         VAR intv: INT; END_VAR
+ *         intv :=   ---42;       <----- ERROR!!
+ *         intv :=   --+42;       <----- ERROR!!
+ *         intv :=  ----42;       <----- ERROR!!
+ *         intv :=  ---+42;       <----- ERROR!!
+ *
+ *    Although strange, we follow the standard to the letter, and do exactly
+ *    as stated above!!
  */
 /* NOTE: We use enumerated_value_without_identifier instead of enumerated_value
  *       in order to remove a reduce/reduce conflict between reducing an
@@ -7251,8 +7318,8 @@ unary_operator: '-' | 'NOT'
  *       for a variable and an enumerated value, then the variable shall be
  *       considered.
  */
-non_negative_primary_expression:
-  non_negative_constant
+non_int_or_real_primary_expression:
+  non_int_or_real_constant
 //| enumerated_value_without_identifier
 | enumerated_value
 | variable
@@ -7904,11 +7971,6 @@ exit_statement:
 #include <errno.h>
 #include "../util/symtable.hh"
 
-/* variables defined in code generated by flex... */
-extern FILE *yyin;
-extern int yylineno;
-extern tracking_t* current_tracking;
-
 
 
 
@@ -8035,7 +8097,6 @@ void print_err_msg(int first_line,
   }
   //fprintf(stderr, "error %d: %s\n", yynerrs /* a global variable */, additional_error_msg);
   print_include_stack();
-  //fprintf(stderr, "%s(%d-%d): %s\n", current_filename, first_line, last_line, current_error_msg);
 }
 
 
@@ -8186,35 +8247,10 @@ int stage2__(const char *filename,
              bool full_token_loc_        /* error messages specify full token location */
             ) {
 
-  FILE *in_file = NULL, *lib_file = NULL;
   char *libfilename = NULL;
-	
-  if((in_file = fopen(filename, "r")) == NULL) {
-    char *errmsg = strdup2("Error opening main file ", filename);
-    perror(errmsg);
-    free(errmsg);
-    return -1;
-  }
 
   if (includedir != NULL) {
     INCLUDE_DIRECTORIES[0] = includedir;
-  }
-  if ((libfilename = strdup3(INCLUDE_DIRECTORIES[0], "/", LIBFILE)) == NULL) {
-    fprintf (stderr, "Out of memory. Bailing out!\n");
-    return -1;
-  }
-
-  if((lib_file = fopen(libfilename, "r")) == NULL) {
-    char *errmsg = strdup2("Error opening library file ", libfilename);
-    perror(errmsg);
-    free(errmsg);
-  }
-
-  if (lib_file == NULL) {
-    /* we give up... */
-    free(libfilename);
-    fclose(in_file);
-    return -1;
   }
 
   /* first parse the standard library file... */
@@ -8224,21 +8260,33 @@ int stage2__(const char *filename,
     yydebug = 1;
   #endif
   */
-  yyin = lib_file;
+
+  if ((libfilename = strdup3(INCLUDE_DIRECTORIES[0], "/", LIBFILE)) == NULL) {
+    fprintf (stderr, "Out of memory. Bailing out!\n");
+    return -1;
+  }
+  
+  FILE *libfile = NULL;
+  if((libfile = parse_file(libfilename)) == NULL) {
+    char *errmsg = strdup2("Error opening library file ", libfilename);
+    perror(errmsg);
+    free(errmsg);
+    /* we give up... */
+    return -1;
+  }
+
   allow_function_overloading = true;
   allow_extensible_function_parameters = true;
   full_token_loc = full_token_loc_;
-  current_filename = libfilename;
-  current_tracking = GetNewTracking(yyin);
   if (yyparse() != 0)
       ERROR;
-
+  fclose(libfile);
+      
   if (yynerrs > 0) {
     fprintf (stderr, "\n%d error(s) found in %s. Bailing out!\n", yynerrs /* global variable */, libfilename);
     ERROR;
   }
   free(libfilename);
-  fclose(lib_file);
 
   /* if by any chance the library is not complete, we
    * now add the missing reserved keywords to the list!!!
@@ -8253,19 +8301,24 @@ int stage2__(const char *filename,
   #if YYDEBUG
     yydebug = 1;
   #endif
-  yyin = in_file;
+  FILE *mainfile = NULL;
+  if ((mainfile = parse_file(filename)) == NULL) {
+    char *errmsg = strdup2("Error opening main file ", filename);
+    perror(errmsg);
+    free(errmsg);
+    return -1;
+  }
+
   allow_function_overloading = false;
   allow_extensible_function_parameters = false;
   full_token_loc = full_token_loc_;
-  current_filename = filename;
-  current_tracking = GetNewTracking(yyin);
-  {int res;
-    if ((res = yyparse()) != 0) {
-      fprintf (stderr, "\nParsing failed because of too many consecutive syntax errors. Bailing out!\n");
-  		exit(EXIT_FAILURE);
-  	}
-  }
 
+  if (yyparse() != 0) {
+    fprintf (stderr, "\nParsing failed because of too many consecutive syntax errors. Bailing out!\n");
+    exit(EXIT_FAILURE);
+  }
+  fclose(mainfile);
+  
   if (yynerrs > 0) {
     fprintf (stderr, "\n%d error(s) found. Bailing out!\n", yynerrs /* global variable */);
     exit(EXIT_FAILURE);
@@ -8274,9 +8327,19 @@ int stage2__(const char *filename,
   if (tree_root_ref != NULL)
     *tree_root_ref = tree_root;
 
-  fclose(in_file);
   return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

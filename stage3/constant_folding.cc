@@ -32,6 +32,16 @@
 
 
 
+/* TODO: 
+ *         - Add support for comparison (= and !=) of enumeration literals!
+ *              We will need to add another const_value entry to the symbol_c, containing the 
+ *              possible enumeration value of the enum constant!
+ *              Doing this will allow us to more easily implement a constant_propagation_c later on!
+ *
+ *         - Add support for comparison (= and !=) of the exact same variable
+ *                (e.g. if (int_v = int_v) then ...)
+ */
+
 
 
 /* Do constant folding...
@@ -107,13 +117,24 @@
  * NOTE 2 
  *    This file does not print out any error messages!
  *    We cannot really print out error messages when we find an overflow. Since each operation
- *    (symbol in the absract syntax tree for that operation) will have up to 4 constant results,
+ *    (symbol in the abstract syntax tree for that operation) will have up to 4 constant results,
  *    it may happen that some of them overflow, while other do not.
  *    We must wait for data type checking to determine the exact data type of each expression
  *    before we can decide whether or not we should print out an overflow error message.
  *
  *    For this reason, this visitor merely annotates the abstract syntax tree, and leaves the
- *    actuall printing of errors for the print_datatype_errors_c class!
+ *    actually printing of errors for the print_datatype_errors_c class!
+ *
+ * NOTE 3
+ *    Constant Folding class is extended with a implementation constant propagation algorithm
+ *    by Mario de Sousa.
+ *    Main idea is not to implement a general constant propagation algorithm but to reinterpret it
+ *    for visitor classes.
+ *    We declared a hash map, it contains a variables list linked with current constant values.
+ *    During expression evaluation we can retrieve a constant value to symbolic variables getting it from the map.
+ *    Also at join source points we use a meet semilattice rules to merge current values between a block
+ *    and adjacent block.
+ *
  */
 
 #include "constant_folding.hh"
@@ -165,34 +186,58 @@
 
 
 
-#define SET_CVALUE(dtype, symbol, new_value)  ((symbol)->const_value._##dtype.value) = new_value; ((symbol)->const_value._##dtype.status) = symbol_c::cs_const_value;
+#define SET_CVALUE(dtype, symbol, new_value) {((symbol)->const_value._##dtype.value) = new_value; ((symbol)->const_value._##dtype.status) = symbol_c::cs_const_value;}
 #define GET_CVALUE(dtype, symbol)             ((symbol)->const_value._##dtype.value)
 #define SET_OVFLOW(dtype, symbol)             ((symbol)->const_value._##dtype.status) = symbol_c::cs_overflow
 #define SET_NONCONST(dtype, symbol)           ((symbol)->const_value._##dtype.status) = symbol_c::cs_non_const
 
 #define VALID_CVALUE(dtype, symbol)           (symbol_c::cs_const_value == (symbol)->const_value._##dtype.status)
+#define IS_OVFLOW(dtype, symbol)              (symbol_c::cs_overflow    == (symbol)->const_value._##dtype.status)
+#define IS_NONCONST(dtype, symbol)            (symbol_c::cs_non_const   == (symbol)->const_value._##dtype.status)
 #define ISZERO_CVALUE(dtype, symbol)          ((VALID_CVALUE(dtype, symbol)) && (GET_CVALUE(dtype, symbol) == 0))
 
 #define ISEQUAL_CVALUE(dtype, symbol1, symbol2) \
 	(VALID_CVALUE(dtype, symbol1) && VALID_CVALUE(dtype, symbol2) && (GET_CVALUE(dtype, symbol1) == GET_CVALUE(dtype, symbol2))) 
 
-#define DO_BINARY_OPER(dtype, oper, otype)\
-	if (VALID_CVALUE(dtype, symbol->r_exp) && VALID_CVALUE(dtype, symbol->l_exp)) {                                \
-		SET_CVALUE(otype, symbol, GET_CVALUE(dtype, symbol->l_exp) oper GET_CVALUE(dtype, symbol->r_exp));     \
-	}
+#define DO_BINARY_OPER(oper_type, operation, res_type, operand1, operand2) {                                              \
+	if      (VALID_CVALUE(oper_type, operand1) && VALID_CVALUE(oper_type, operand2))                                  \
+		{SET_CVALUE(res_type, symbol, GET_CVALUE(oper_type, operand1) operation GET_CVALUE(oper_type, operand2));}\
+	else if (IS_OVFLOW   (oper_type, operand1) || IS_OVFLOW   (oper_type, operand2))                                  \
+		{SET_OVFLOW(res_type, symbol);}  /* does it really make sense to set OVFLOW when restype is boolean??  */ \
+	else if (IS_NONCONST (oper_type, operand1) || IS_NONCONST (oper_type, operand2))                                  \
+		{SET_NONCONST(res_type, symbol);}                                                                         \
+}
 
-#define DO_BINARY_OPER_(oper_type, operation, res_type, operand1, operand2)\
-	if (VALID_CVALUE(oper_type, operand1) && VALID_CVALUE(oper_type, operand2)) {                                     \
-		SET_CVALUE(res_type, symbol, GET_CVALUE(oper_type, operand1) operation GET_CVALUE(oper_type, operand2));  \
-	}
+#define DO_UNARY_OPER(dtype, operation, operand) {                                                                        \
+	if      (VALID_CVALUE(dtype, operand))                                                                            \
+		{SET_CVALUE(dtype, symbol, operation GET_CVALUE(dtype, operand));}                                        \
+	else if (IS_OVFLOW   (dtype, operand))                                                                            \
+		{SET_OVFLOW(dtype, symbol);}                                                                              \
+	else if (IS_NONCONST (dtype, operand))                                                                            \
+		{SET_NONCONST(dtype, symbol);}                                                                            \
+}
 
-#define DO_UNARY_OPER(dtype, operation, operand)\
-	if (VALID_CVALUE(dtype, operand)) {                                                                               \
-		SET_CVALUE(dtype, symbol, operation GET_CVALUE(dtype, operand));                                          \
-	}
+/* Constant Propagation: Rules for Meet from "Cooper K., Torczon L. - Engineering a Compiler, Second Edition - 2011"
+ * at 9.3 Static Single-Assignment Form  page 517
+ * - any * undefined = any
+ * - any * non_const = non_const
+ * - constant * constant = constant  (if equal)
+ * - constant * constant = non_const (if not equal)
+ */
+#define COMPUTE_MEET_SEMILATTICE(dtype, c1, c2, resValue) {\
+		if (( c1._##dtype.value  != c2._##dtype.value && c2._##dtype.status == symbol_c::cs_const_value &&\
+              c1._##dtype.status == symbol_c::cs_const_value) ||\
+		    ( c1._##dtype.status == symbol_c::cs_non_const && c2._##dtype.status == symbol_c::cs_const_value ) ||\
+		    ( c2._##dtype.status == symbol_c::cs_non_const && c1._##dtype.status == symbol_c::cs_const_value  )) {\
+			resValue._##dtype.status = symbol_c::cs_non_const;\
+		} else {\
+			resValue._##dtype.status = symbol_c::cs_const_value;\
+			resValue._##dtype.value  = c1._##dtype.value;\
+		}\
+}
 
 
-
+static std::map <std::string, symbol_c::const_value_t> values;
 
 
 /***********************************************************************/
@@ -215,7 +260,11 @@
    * by having it resolve the call to the overloaded function. For the C++ compiler to be able
    * to resolve this ambiguity, we need to add a dummy parameter to each function!
    *
-   * TODO: support platforms in which int64_t is mapped onto int !! Is this really needed?
+   * TODO: support platforms (where the compiler will run) in which int64_t is mapped onto int !!
+   *       Is this really needed?
+   *       Currently, when trying to compile matiec on sych a platform, the C++ compiler will not
+   *       find any apropriate matiec_strtoint64() to call, so matiec will not be able to be compiled.
+   *       If you need this, you are welcome to fix it yourself...
    */
 static  int64_t matiec_strtoint64 (         long      int *dummy, const char *nptr, char **endptr, int base) {return strtol  (nptr, endptr, base);}
 static  int64_t matiec_strtoint64 (         long long int *dummy, const char *nptr, char **endptr, int base) {return strtoll (nptr, endptr, base);}
@@ -234,7 +283,7 @@ int64_t extract_int64_value(symbol_c *sym, bool *overflow) {
   int64_t      ret;
   std::string  str = "";
   char        *endptr;
-  const char  *value;
+  const char  *value = NULL;
   int          base;
   integer_c         *integer;
   hex_integer_c     *hex_integer;
@@ -266,7 +315,7 @@ uint64_t extract_uint64_value(symbol_c *sym, bool *overflow) {
   uint64_t     ret;
   std::string  str = "";
   char        *endptr;
-  const char  *value;
+  const char  *value = NULL;
   int          base;
   integer_c         *integer;
   hex_integer_c     *hex_integer;
@@ -423,6 +472,18 @@ static void CHECK_OVERFLOW_uint64_MOD(symbol_c *res, symbol_c *a, symbol_c *b) {
 }
 
 
+/* res = - a */
+static void CHECK_OVERFLOW_uint64_NEG(symbol_c *res, symbol_c *a) {
+	/* The only legal operation is res = -0, everything else is an overflow! */
+	if (VALID_CVALUE(uint64, a) && (GET_CVALUE(uint64, a) != 0))
+		SET_OVFLOW(uint64, res);
+}
+
+
+
+
+
+
 /* res = a + b */
 static void CHECK_OVERFLOW_int64_SUM(symbol_c *res, symbol_c *a_ptr, symbol_c *b_ptr) {
 	if (!VALID_CVALUE(int64, res))
@@ -494,13 +555,13 @@ static void CHECK_OVERFLOW_int64_MOD(symbol_c *res, symbol_c *a_ptr, symbol_c *b
 
 
 /* res = - a */
-static void CHECK_OVERFLOW_int64_NEG(symbol_c *res, symbol_c *a_ptr) {
+static void CHECK_OVERFLOW_int64_NEG(symbol_c *res, symbol_c *a) {
 	if (!VALID_CVALUE(int64, res))
 		return;
-	int64_t a = GET_CVALUE(int64, a_ptr);
-	if (a == INT64_MIN)
+	if (GET_CVALUE(int64, a) == INT64_MIN)
 		SET_OVFLOW(int64, res);
 }
+
 
 
 
@@ -532,10 +593,10 @@ static void CHECK_OVERFLOW_real64(symbol_c *res_ptr) {
 /* static void *handle_cmp(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2, OPERATION) */
 #define handle_cmp(symbol, oper1, oper2, operation) {               \
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;        \
-	DO_BINARY_OPER_(  bool, operation, bool, oper1, oper2);     \
-	DO_BINARY_OPER_(uint64, operation, bool, oper1, oper2);     \
-	DO_BINARY_OPER_( int64, operation, bool, oper1, oper2);     \
-	DO_BINARY_OPER_(real64, operation, bool, oper1, oper2);     \
+	DO_BINARY_OPER(  bool, operation, bool, oper1, oper2);     \
+	DO_BINARY_OPER(uint64, operation, bool, oper1, oper2);     \
+	DO_BINARY_OPER( int64, operation, bool, oper1, oper2);     \
+	DO_BINARY_OPER(real64, operation, bool, oper1, oper2);     \
 	return NULL;                                                \
 }
 
@@ -550,7 +611,17 @@ static void *handle_move(symbol_c *to, symbol_c *from) {
 
 /* unary negation (multiply by -1) */
 static void *handle_neg(symbol_c *symbol, symbol_c *oper) {
-	DO_UNARY_OPER( int64, -, oper);	CHECK_OVERFLOW_int64_NEG(symbol, oper);
+	if (NULL == oper) return NULL;
+	/* NOTE: The oper may never be an integer/real literal, '-1' and '-2.2' are stored as an neg_integer_c/neg_real_c instead.
+	 *       Because of this, we MUST NOT handle the INT_MIN special situation that is handled in neg_integer_c visitor!
+	 *
+	 *       VAR v1, v2, v3 : UINT; END_VAR;
+	 *       v1 =  9223372036854775808 ; (* |INT64_MIN| == -INT64_MIN *)   <------ LEGAL
+	 *       v2 =  -(-v1);                                                 <------ ILLEGAL (since it -v1 is overflow!)
+	 *       v2 =  -(-9223372036854775808 );                               <------ MUST also be ILLEGAL 
+	 */
+	DO_UNARY_OPER(uint64, -, oper);	CHECK_OVERFLOW_uint64_NEG(symbol, oper);  /* handle the uint_v := -0 situation! */
+	DO_UNARY_OPER( int64, -, oper);	CHECK_OVERFLOW_int64_NEG (symbol, oper);
 	DO_UNARY_OPER(real64, -, oper);	CHECK_OVERFLOW_real64(symbol);
 	return NULL;
 }
@@ -567,60 +638,60 @@ static void *handle_not(symbol_c *symbol, symbol_c *oper) {
 
 static void *handle_or (symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	DO_BINARY_OPER_(  bool, ||, bool  , oper1, oper2);
-	DO_BINARY_OPER_(uint64, | , uint64, oper1, oper2);
+	DO_BINARY_OPER(  bool, ||, bool  , oper1, oper2);
+	DO_BINARY_OPER(uint64, | , uint64, oper1, oper2);
 	return NULL;
 }
 
 
 static void *handle_xor(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	DO_BINARY_OPER_(  bool, ^, bool  , oper1, oper2);
-	DO_BINARY_OPER_(uint64, ^, uint64, oper1, oper2);
+	DO_BINARY_OPER(  bool, ^, bool  , oper1, oper2);
+	DO_BINARY_OPER(uint64, ^, uint64, oper1, oper2);
 	return NULL;
 }
 
 
 static void *handle_and(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	DO_BINARY_OPER_(  bool, &&, bool, oper1, oper2);
-	DO_BINARY_OPER_(uint64, & , uint64, oper1, oper2);
+	DO_BINARY_OPER(  bool, &&, bool, oper1, oper2);
+	DO_BINARY_OPER(uint64, & , uint64, oper1, oper2);
 	return NULL;
 }
 
 
 static void *handle_add(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	DO_BINARY_OPER_(uint64, +, uint64, oper1, oper2);   CHECK_OVERFLOW_uint64_SUM(symbol, oper1, oper2);
-	DO_BINARY_OPER_( int64, +,  int64, oper1, oper2);   CHECK_OVERFLOW_int64_SUM (symbol, oper1, oper2);
-	DO_BINARY_OPER_(real64, +, real64, oper1, oper2);   CHECK_OVERFLOW_real64    (symbol);
+	DO_BINARY_OPER(uint64, +, uint64, oper1, oper2);   CHECK_OVERFLOW_uint64_SUM(symbol, oper1, oper2);
+	DO_BINARY_OPER( int64, +,  int64, oper1, oper2);   CHECK_OVERFLOW_int64_SUM (symbol, oper1, oper2);
+	DO_BINARY_OPER(real64, +, real64, oper1, oper2);   CHECK_OVERFLOW_real64    (symbol);
 	return NULL;
 }
 
 
 static void *handle_sub(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	DO_BINARY_OPER_(uint64, -, uint64, oper1, oper2);   CHECK_OVERFLOW_uint64_SUB(symbol, oper1, oper2);
-	DO_BINARY_OPER_( int64, -,  int64, oper1, oper2);   CHECK_OVERFLOW_int64_SUB (symbol, oper1, oper2);
-	DO_BINARY_OPER_(real64, -, real64, oper1, oper2);   CHECK_OVERFLOW_real64    (symbol);
+	DO_BINARY_OPER(uint64, -, uint64, oper1, oper2);   CHECK_OVERFLOW_uint64_SUB(symbol, oper1, oper2);
+	DO_BINARY_OPER( int64, -,  int64, oper1, oper2);   CHECK_OVERFLOW_int64_SUB (symbol, oper1, oper2);
+	DO_BINARY_OPER(real64, -, real64, oper1, oper2);   CHECK_OVERFLOW_real64    (symbol);
 	return NULL;
 }
 
 
 static void *handle_mul(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	DO_BINARY_OPER_(uint64, *, uint64, oper1, oper2);   CHECK_OVERFLOW_uint64_MUL(symbol, oper1, oper2);
-	DO_BINARY_OPER_( int64, *,  int64, oper1, oper2);   CHECK_OVERFLOW_int64_MUL (symbol, oper1, oper2);
-	DO_BINARY_OPER_(real64, *, real64, oper1, oper2);   CHECK_OVERFLOW_real64    (symbol);
+	DO_BINARY_OPER(uint64, *, uint64, oper1, oper2);   CHECK_OVERFLOW_uint64_MUL(symbol, oper1, oper2);
+	DO_BINARY_OPER( int64, *,  int64, oper1, oper2);   CHECK_OVERFLOW_int64_MUL (symbol, oper1, oper2);
+	DO_BINARY_OPER(real64, *, real64, oper1, oper2);   CHECK_OVERFLOW_real64    (symbol);
 	return NULL;
 }
 
 
 static void *handle_div(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	if ((NULL == oper1) || (NULL == oper2)) return NULL;
-	if (ISZERO_CVALUE(uint64, oper2))  {SET_OVFLOW(uint64, symbol);} else {DO_BINARY_OPER_(uint64, /, uint64, oper1, oper2); CHECK_OVERFLOW_uint64_DIV(symbol, oper1, oper2);};
-	if (ISZERO_CVALUE( int64, oper2))  {SET_OVFLOW( int64, symbol);} else {DO_BINARY_OPER_( int64, /,  int64, oper1, oper2); CHECK_OVERFLOW_int64_DIV (symbol, oper1, oper2);};
-	if (ISZERO_CVALUE(real64, oper2))  {SET_OVFLOW(real64, symbol);} else {DO_BINARY_OPER_(real64, /, real64, oper1, oper2); CHECK_OVERFLOW_real64(symbol);};
+	if (ISZERO_CVALUE(uint64, oper2))  {SET_OVFLOW(uint64, symbol);} else {DO_BINARY_OPER(uint64, /, uint64, oper1, oper2); CHECK_OVERFLOW_uint64_DIV(symbol, oper1, oper2);};
+	if (ISZERO_CVALUE( int64, oper2))  {SET_OVFLOW( int64, symbol);} else {DO_BINARY_OPER( int64, /,  int64, oper1, oper2); CHECK_OVERFLOW_int64_DIV (symbol, oper1, oper2);};
+	if (ISZERO_CVALUE(real64, oper2))  {SET_OVFLOW(real64, symbol);} else {DO_BINARY_OPER(real64, /, real64, oper1, oper2); CHECK_OVERFLOW_real64(symbol);};
 	return NULL;
 }
 
@@ -633,8 +704,8 @@ static void *handle_mod(symbol_c *symbol, symbol_c *oper1, symbol_c *oper2) {
 	 * Note that, when IN1 = INT64_MIN, and IN2 = -1, an overflow occurs in the division,
 	 * so although the MOD operation should be OK, acording to the above definition, we actually have an overflow!!
 	 */
-	if (ISZERO_CVALUE(uint64, oper2))  {SET_CVALUE(uint64, symbol, 0);} else {DO_BINARY_OPER_(uint64, %, uint64, oper1, oper2); CHECK_OVERFLOW_uint64_MOD(symbol, oper1, oper2);};
-	if (ISZERO_CVALUE( int64, oper2))  {SET_CVALUE( int64, symbol, 0);} else {DO_BINARY_OPER_( int64, %,  int64, oper1, oper2); CHECK_OVERFLOW_int64_MOD (symbol, oper1, oper2);};
+	if (ISZERO_CVALUE(uint64, oper2))  {SET_CVALUE(uint64, symbol, 0);} else {DO_BINARY_OPER(uint64, %, uint64, oper1, oper2); CHECK_OVERFLOW_uint64_MOD(symbol, oper1, oper2);};
+	if (ISZERO_CVALUE( int64, oper2))  {SET_CVALUE( int64, symbol, 0);} else {DO_BINARY_OPER( int64, %,  int64, oper1, oper2); CHECK_OVERFLOW_int64_MOD (symbol, oper1, oper2);};
 	return NULL;
 }
 
@@ -698,6 +769,9 @@ constant_folding_c::constant_folding_c(symbol_c *symbol) {
     error_count = 0;
     warning_found = false;
     current_display_error_level = 0;
+    il_operand = NULL;
+    search_varfb_instance_type = NULL;
+    prev_il_instruction = NULL;
     
     /* check whether the platform on which the compiler is being run implements IEC 559 floating point data types. */
     symbol_c null_symbol;
@@ -744,19 +818,39 @@ void *constant_folding_c::visit(integer_c *symbol) {
 
 void *constant_folding_c::visit(neg_real_c *symbol) {
 	symbol->exp->accept(*this);
-	DO_UNARY_OPER(real64, -, symbol->exp);
-	CHECK_OVERFLOW_real64(symbol);
+	DO_UNARY_OPER(real64, -, symbol->exp); CHECK_OVERFLOW_real64(symbol);
+	if (IS_OVFLOW(real64, symbol->exp)) SET_OVFLOW(real64, symbol);
 	return NULL;
 }
+
+
 
 /* | '-' integer	{$$ = new neg_integer_c($2, locloc(@$));} */
 void *constant_folding_c::visit(neg_integer_c *symbol) {
 	symbol->exp->accept(*this);
-	DO_UNARY_OPER(int64, -, symbol->exp);
-	CHECK_OVERFLOW_int64_NEG(symbol, symbol->exp);
+	/* Note that due to syntax restrictions, the value of symbol->exp will always be positive. 
+	 * However, the following code does not depend on that restriction.
+	 */
+	/* The remainder of the code (for example, data type checking) considers the neg_integer_c as a leaf of the
+	 * abstract syntax tree, and therefore simply ignores the values of neg_integer_c->exp.
+	 * For this reason only, and in only this situation, we must guarantee that any 'overflow' situation in 
+	 * the cvalue of neg_integer_c->exp is also reflected back to this neg_integer_c symbol.
+	 * For the rest of the code we do NOT do this, as it would gurantee that a single overflow deep inside
+	 * an expression would imply that the expression itself would also be set to 'overflow' condition.
+	 * This in turn would then have the compiler produce a whole load of error messages where they are not wanted!
+	 */
+	DO_UNARY_OPER(uint64, -, symbol->exp); CHECK_OVERFLOW_uint64_NEG(symbol, symbol->exp);  /* handle the uintv := -0 situation */
+	if (IS_OVFLOW(uint64, symbol->exp)) SET_OVFLOW(uint64, symbol);
+	DO_UNARY_OPER( int64, -, symbol->exp); CHECK_OVERFLOW_int64_NEG (symbol, symbol->exp);
+	if (IS_OVFLOW( int64, symbol->exp)) SET_OVFLOW( int64, symbol);
 	/* NOTE 1: INT64_MIN = -(INT64_MAX + 1)   ---> assuming two's complement representation!!!
 	 * NOTE 2: if the user happens to want INT_MIN, that value will first be parsed as a positive integer, before being negated here.
 	 * However, the positive value cannot be stored inside an int64! So, in this case, we will get the value from the uint64 cvalue.
+	 *
+	 * This same situation is usually considered an overflow (check handle_neg() function). However, here we have a special
+	 * situation. If we do not allow this, then the user would never the able to use the following code:
+	 *  VAR v : LINT; END_VAR
+	 *    v := -9223372036854775809 ; (* - |INT64_MIN| == INT64_MIN *)
 	 */
 	// if (INT64_MIN == -INT64_MAX - 1) // We do not really need to check that the platform uses two's complement
 	if (VALID_CVALUE(uint64, symbol->exp) && (GET_CVALUE(uint64, symbol->exp) == (uint64_t)INT64_MAX+1)) {
@@ -852,6 +946,37 @@ void *constant_folding_c::visit(fixed_point_c *symbol) {
 	return NULL;
 }
 
+/*********************/
+/* B 1.4 - Variables */
+/*********************/
+void *constant_folding_c::visit(symbolic_variable_c *symbol) {
+	std::string varName;
+
+	varName = get_var_name_c::get_name(symbol->var_name)->value;
+	if (values.count(varName) > 0) {
+		symbol->const_value = values[varName];
+	}
+	return NULL;
+}
+
+/**********************/
+/* B 1.5.3 - Programs */
+/**********************/
+void *constant_folding_c::visit(program_declaration_c *symbol) {
+	symbol_c *var_name;
+
+	values.clear(); /* Clear global map */
+	search_var_instance_decl_c search_var_instance_decl(symbol);
+	function_param_iterator_c fpi(symbol);
+	while((var_name = fpi.next()) != NULL) {
+		std::string varName = get_var_name_c::get_name(var_name)->value;
+		symbol_c   *varDecl = search_var_instance_decl.get_decl(var_name);
+		values[varName] = varDecl->const_value;
+	}
+	/* Add all variables declared into Values map and put them to initial value */
+	symbol->function_block_body->accept(*this);
+	return NULL;
+}
 
 
 /****************************************/
@@ -918,8 +1043,9 @@ void *constant_folding_c::visit(il_simple_operation_c *symbol) {
 void *constant_folding_c::visit(il_expression_c *symbol) {
   symbol_c *prev_il_instruction_backup = prev_il_instruction;
   
-  if (NULL != symbol->il_operand)
-    symbol->il_operand->accept(*this);
+  /* Stage2 will insert an artificial (and equivalent) LD <il_operand> to the simple_instr_list if necessary. We can therefore ignore the 'il_operand' entry! */
+  // if (NULL != symbol->il_operand)
+  //   symbol->il_operand->accept(*this);
 
   if(symbol->simple_instr_list != NULL)
     symbol->simple_instr_list->accept(*this);
@@ -932,6 +1058,16 @@ void *constant_folding_c::visit(il_expression_c *symbol) {
   
   /* This object has (inherits) the same cvalues as the il_instruction */
   symbol->const_value = symbol->il_expr_operator->const_value;
+  
+  /* Since stage2 will insert an artificial (and equivalent) LD <il_operand> to the simple_instr_list when an 'il_operand' exists, we know
+   * that if (symbol->il_operand != NULL), then the first IL instruction in the simple_instr_list will be the equivalent and artificial
+   * 'LD <il_operand>' IL instruction.
+   * Just to be cosistent, we will copy the constant info back into the il_operand, even though this should not be necessary!
+   */
+  if ((NULL != symbol->il_operand) && ((NULL == symbol->simple_instr_list) || (0 == ((list_c *)symbol->simple_instr_list)->n))) ERROR; // stage2 is not behaving as we expect it to!
+  if  (NULL != symbol->il_operand)
+    symbol->il_operand->const_value = ((list_c *)symbol->simple_instr_list)->elements[0]->const_value;
+
   return NULL;
 }
 
@@ -1110,3 +1246,180 @@ void *constant_folding_c::visit(   not_expression_c *symbol) {symbol->  exp->acc
 
 /* TODO: handle function invocations... */
 // void *fill_candidate_datatypes_c::visit(function_invocation_c *symbol) {}
+
+
+
+
+/*********************************/
+/* B 3.2.1 Assignment Statements */
+/*********************************/
+void *constant_folding_c::visit(assignment_statement_c *symbol) {
+	std::string varName;
+
+	symbol->r_exp->accept(*this);
+	symbol->l_exp->const_value = symbol->r_exp->const_value;
+	varName = get_var_name_c::get_name(symbol->l_exp)->value;
+	values[varName] = symbol->l_exp->const_value;
+
+	return NULL;
+}
+
+/********************************/
+/* B 3.2.3 Selection Statements */
+/********************************/
+void *constant_folding_c::visit(if_statement_c *symbol) {
+	std::map <std::string, symbol_c::const_value_t> values_incoming;
+	std::map <std::string, symbol_c::const_value_t> values_statement_result;
+	std::map <std::string, symbol_c::const_value_t> values_elsestatement_result;
+	std::map <std::string, symbol_c::const_value_t>::iterator itr;
+
+	/* Optimize dead code */
+	symbol->expression->accept(*this);
+	if (VALID_CVALUE(bool, symbol->expression) && GET_CVALUE(bool, symbol->expression) == false)
+		return NULL;
+
+	values_incoming = values; /* save incoming status */
+	symbol->statement_list->accept(*this);
+	values_statement_result = values;
+	if (NULL != symbol->else_statement_list) {
+		values = values_incoming;
+		symbol->else_statement_list->accept(*this);
+		values_elsestatement_result = values;
+	} else
+		values_elsestatement_result = values_incoming;
+	values.clear();
+	itr = values_statement_result.begin();
+	for ( ; itr != values_statement_result.end(); ++itr) {
+		std::string name = itr->first;
+		symbol_c::const_value_t value;
+
+		if (values_elsestatement_result.count(name) > 0) {
+			symbol_c::const_value_t c1 = itr->second;
+			symbol_c::const_value_t c2 = values_elsestatement_result[name];
+			COMPUTE_MEET_SEMILATTICE (real64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (uint64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE ( int64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (  bool, c1, c2, value);
+		} else
+			value = values_statement_result[name];
+		values[name] = value;
+	}
+
+	return NULL;
+}
+
+/********************************/
+/* B 3.2.4 Iteration Statements */
+/********************************/
+void *constant_folding_c::visit(for_statement_c *symbol) {
+	std::map <std::string, symbol_c::const_value_t> values_incoming;
+	std::map <std::string, symbol_c::const_value_t> values_statement_result;
+	std::map <std::string, symbol_c::const_value_t>::iterator itr;
+	std::string varName;
+
+	values_incoming = values; /* save incoming status */
+	symbol->beg_expression->accept(*this);
+	symbol->end_expression->accept(*this);
+	varName =  get_var_name_c::get_name(symbol->control_variable)->value;
+	values[varName] = symbol->beg_expression->const_value;
+
+	/* Optimize dead code */
+	if (VALID_CVALUE(int64, symbol->beg_expression) && VALID_CVALUE(int64, symbol->end_expression) &&
+		  GET_CVALUE(int64, symbol->beg_expression) >    GET_CVALUE(int64, symbol->end_expression))
+		return NULL;
+
+	symbol->statement_list->accept(*this);
+	values_statement_result = values;
+	values.clear();
+	itr = values_statement_result.begin();
+	for ( ; itr != values_statement_result.end(); ++itr) {
+		std::string name = itr->first;
+		symbol_c::const_value_t value;
+
+		if (values_incoming.count(name) > 0) {
+			symbol_c::const_value_t c1 = itr->second;
+			symbol_c::const_value_t c2 = values_incoming[name];
+			COMPUTE_MEET_SEMILATTICE (real64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (uint64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE ( int64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (  bool, c1, c2, value);
+		} else
+			value = values_statement_result[name];
+		values[name] = value;
+	}
+
+	return NULL;
+}
+
+void *constant_folding_c::visit(while_statement_c *symbol) {
+	std::map <std::string, symbol_c::const_value_t> values_incoming;
+	std::map <std::string, symbol_c::const_value_t> values_statement_result;
+	std::map <std::string, symbol_c::const_value_t>::iterator itr;
+
+	/* Optimize dead code */
+	symbol->expression->accept(*this);
+	if (VALID_CVALUE(bool, symbol->expression) && GET_CVALUE(bool, symbol->expression) == false)
+		return NULL;
+
+	values_incoming = values; /* save incoming status */
+	symbol->statement_list->accept(*this);
+	values_statement_result = values;
+	values.clear();
+	itr = values_statement_result.begin();
+	for ( ; itr != values_statement_result.end(); ++itr) {
+		std::string name = itr->first;
+		symbol_c::const_value_t value;
+
+		if (values_incoming.count(name) > 0) {
+			symbol_c::const_value_t c1 = itr->second;
+			symbol_c::const_value_t c2 = values_incoming[name];
+			COMPUTE_MEET_SEMILATTICE (real64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (uint64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE ( int64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (  bool, c1, c2, value);
+		} else
+			value = values_statement_result[name];
+		values[name] = value;
+	}
+
+
+	return NULL;
+}
+
+void *constant_folding_c::visit(repeat_statement_c *symbol) {
+	std::map <std::string, symbol_c::const_value_t> values_incoming;
+	std::map <std::string, symbol_c::const_value_t> values_statement_result;
+	std::map <std::string, symbol_c::const_value_t>::iterator itr;
+
+	/* Optimize dead code */
+	symbol->expression->accept(*this);
+	if (VALID_CVALUE(bool, symbol->expression) && GET_CVALUE(bool, symbol->expression) == false)
+		return NULL;
+
+	values_incoming = values; /* save incoming status */
+	symbol->statement_list->accept(*this);
+	values_statement_result = values;
+	values.clear();
+	itr = values_statement_result.begin();
+	for ( ; itr != values_statement_result.end(); ++itr) {
+		std::string name = itr->first;
+		symbol_c::const_value_t value;
+
+		if (values_incoming.count(name) > 0) {
+			symbol_c::const_value_t c1 = itr->second;
+			symbol_c::const_value_t c2 = values_incoming[name];
+			COMPUTE_MEET_SEMILATTICE (real64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (uint64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE ( int64, c1, c2, value);
+			COMPUTE_MEET_SEMILATTICE (  bool, c1, c2, value);
+		} else
+			value = values_statement_result[name];
+		values[name] = value;
+	}
+
+
+	return NULL;
+}
+
+
+

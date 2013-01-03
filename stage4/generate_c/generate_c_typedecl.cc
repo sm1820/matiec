@@ -31,8 +31,6 @@ class generate_c_typedecl_c: public generate_c_base_c {
   private:
     symbol_c* current_type_name;
     bool array_is_derived;
-    search_base_type_c search_base_type;
-    search_constant_type_c search_constant_type;
 
     generate_c_base_c *basedecl;
 
@@ -58,7 +56,7 @@ class generate_c_typedecl_c: public generate_c_base_c {
       enumerated_td,
       subrange_td,
       array_td,
-      struct_td,
+      struct_td
     } typedefinition_t;
 
     typedefinition_t current_typedefinition;
@@ -101,7 +99,7 @@ class generate_c_typedecl_c: public generate_c_base_c {
     }
 
     bool type_is_fb(symbol_c* type_decl) {
-      return search_base_type.type_is_fb(type_decl);
+      return search_base_type_c::type_is_fb(type_decl);
     }
 
 /***************************/
@@ -210,7 +208,7 @@ void *visit(subrange_specification_c *symbol) {
           s4o.print(" value) {\n");
           s4o.indent_right();
 
-          if (search_base_type.type_is_subrange(symbol->integer_type_name)) {
+          if (search_base_type_c::type_is_subrange(symbol->integer_type_name)) {
             s4o.print(s4o.indent_spaces + "value = __CHECK_");
             symbol->integer_type_name->accept(*this);
             s4o.print("(value);\n");
@@ -319,14 +317,18 @@ void *visit(enumerated_value_list_c *symbol) {
 
 /* enumerated_type_name '#' identifier */
 void *visit(enumerated_value_c *symbol) {
-  symbol_c *value_type;
   if (current_typedefinition == enumerated_td)
     current_type_name->accept(*basedecl);
   else {
-    value_type = (symbol_c *)symbol->accept(search_constant_type);
-    if (value_type == NULL) ERROR;
-
-    value_type->accept(*basedecl);
+    if (NULL == symbol->datatype) {
+      debug_c::print(symbol);
+      ERROR;
+    }
+    symbol_c *type_name = get_datatype_info_c::get_id(symbol->datatype);
+    if (NULL == type_name) {
+//       ERROR_MSG("generate_c does not support anonymous enumerated data types.");
+    } else
+    type_name->accept(*basedecl);
   }
   s4o_incl.print("__");
   symbol->value->accept(*basedecl);
@@ -441,7 +443,7 @@ void *visit(simple_type_declaration_c *symbol) {
   symbol->simple_spec_init->accept(*this);
   s4o_incl.print(")\n");
 
-  if (search_base_type.type_is_subrange(symbol->simple_type_name)) {
+  if (search_base_type_c::type_is_subrange(symbol->simple_type_name)) {
     s4o.print("#define __CHECK_");
     current_type_name->accept(*this);
     s4o.print(" __CHECK_");

@@ -77,21 +77,6 @@ extern symtable_c<program_declaration_c *, &null_symbol3> program_type_symtable;
 extern symbol_c null_symbol4;
 extern symtable_c<symbol_c *, &null_symbol4> type_symtable;
 
-/* A symbol table with all values declared for enumerated type... */
-/* Notes:
- * - if the value is defined multiple times the value
- * is the null pointer.
- *
- * - The stored symbol_c * associated to the value points to the enumerated_type_name
- * (i.e. the name of the enumerated data type) in which the the value/identifier
- * is used/declared.
- *
- * - We could re-use the null_symbol4 object, but it is safer to use a distinct object
- *   (i.e. it might make it easier to find strange bugs).
- */
-extern symbol_c null_symbol5;
-extern symtable_c<symbol_c *, &null_symbol5> enumerated_value_symtable;
-
 
 /***********************************************************************/
 /***********************************************************************/
@@ -111,13 +96,12 @@ extern symtable_c<symbol_c *, &null_symbol5> enumerated_value_symtable;
 #include "search_var_instance_decl.hh"
 #include "decompose_var_instance_name.hh"
 #include "search_varfb_instance_type.hh"
-#include "search_constant_type.hh"
-#include "search_il_operand_type.hh"
-#include "search_expression_type.hh"
 #include "add_en_eno_param_decl.hh"
 #include "get_sizeof_datatype.hh"
 #include "search_il_label.hh"
 #include "get_var_name.hh"
+#include "get_datatype_info.hh"
+#include "debug_ast.hh"
 
 /***********************************************************************/
 /***********************************************************************/

@@ -43,6 +43,10 @@
  *  The candidate datatype list will be filled with a list of all the data types that expression may legally take.
  *  For example, the very simple literal '0' (as in foo := 0), may represent a:
  *    BOOL, BYTE, WORD, DWORD, LWORD, USINT, SINT, UINT, INT, UDINT, DINT, ULINT, LINT (as well as the SAFE versions of these data tyes too!)
+ *
+ * WARNING: This visitor class starts off by building a map of all enumeration constants that are defined in the source code (i.e. a library_c symbol),
+ *          and this map is later used to determine the datatpe of each use of an enumeration constant. By implication, the fill_candidate_datatypes_c 
+ *          visitor class will only work corretly if it is asked to visit a symbol of class library_c!!
  */
 
 
@@ -53,7 +57,6 @@ class fill_candidate_datatypes_c: public iterator_visitor_c {
 
   private:
     search_varfb_instance_type_c *search_varfb_instance_type;
-    search_base_type_c search_base_type;
     /* When calling a function block, we must first find it's type,
      * by searching through the declarations of the variables currently
      * in scope.
@@ -70,23 +73,11 @@ class fill_candidate_datatypes_c: public iterator_visitor_c {
     //     search_var_instance_decl_c *search_var_instance_decl;
 
     /* This variable was created to pass information from
-     * fill_candidate_datatypes_c::visit(case_statement_c *symbol) function to
-     * fill_candidate_datatypes_c::visit(case_list_c *symbol) function.
+     * fill_candidate_datatypes_c::visit(enumerated_spec_init_c *symbol) function to
+     * fill_candidate_datatypes_c::visit(enumerated_value_list_c *symbol) function.
      */
-//     symbol_c *case_expression_type;
-
-    /* In IL code, once we find a type mismatch error, it is best to
-     * ignore any further errors until the end of the logical operation,
-     * i.e. until the next LD.
-     * However, we cannot clear the il_error flag on all LD operations,
-     * as these may also be used within parenthesis. LD operations
-     * within parenthesis may not clear the error flag.
-     * We therefore need a counter to know how deep inside a parenthesis
-     * structure we are.
-     */
-//     int  il_parenthesis_level;
-//     bool error_found;
-
+    symbol_c *current_enumerated_spec_type;
+    
     /* Pointer to the previous IL instruction, which contains the current data type (actually, the list of candidate data types) of the data stored in the IL stack, i.e. the default variable, a.k.a. accumulator */
     symbol_c *prev_il_instruction;
     /* the current IL operand being analyzed */
@@ -99,8 +90,9 @@ class fill_candidate_datatypes_c: public iterator_visitor_c {
     bool  match_formal_call   (symbol_c *f_call, symbol_c *f_decl, symbol_c **first_param_datatype = NULL);
     void  handle_function_call(symbol_c *fcall, generic_function_call_t fcall_data);
     void *handle_implicit_il_fb_call(symbol_c *il_instruction, const char *param_name, symbol_c *&called_fb_declaration);
-    void *handle_binary_expression(const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr);
-    void *handle_binary_operator  (const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr);
+    void *handle_equality_comparison(const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr);
+    void *handle_binary_expression  (const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr);
+    void *handle_binary_operator    (const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr);
     void *handle_conditional_il_flow_control_operator(symbol_c *symbol);
     
     /* a helper function... */
@@ -117,6 +109,11 @@ class fill_candidate_datatypes_c: public iterator_visitor_c {
     fill_candidate_datatypes_c(symbol_c *ignore);
     virtual ~fill_candidate_datatypes_c(void);
 
+    
+    /***************************/
+    /* B 0 - Programming Model */
+    /***************************/
+    void *visit(library_c *symbol);
 
     /*********************/
     /* B 1.2 - Constants */
@@ -170,11 +167,33 @@ class fill_candidate_datatypes_c: public iterator_visitor_c {
     /********************************/
     /* B 1.3.3 - Derived data types */
     /********************************/
+//  void *visit(data_type_declaration_c *symbol);   /* Not required. already handled by iterator_visitor_c base class */
+//  void *visit(type_declaration_list_c *symbol);   /* Not required. already handled by iterator_visitor_c base class */
+//  void *visit(simple_type_declaration_c *symbol); /* Not required. already handled by iterator_visitor_c base class */
     void *visit(simple_spec_init_c *symbol);
+//  void *visit(subrange_type_declaration_c *symbol);
+//  void *visit(subrange_spec_init_c *symbol);
+//  void *visit(subrange_specification_c *symbol);
     void *visit(subrange_c *symbol);
-//  void *visit(data_type_declaration_c *symbol);
+    void *visit(enumerated_type_declaration_c *symbol);
+    void *visit(enumerated_spec_init_c *symbol);
+    void *visit(enumerated_value_list_c *symbol);
     void *visit(enumerated_value_c *symbol);
+//  void *visit(array_type_declaration_c *symbol);
+//  void *visit(array_spec_init_c *symbol);
+//  void *visit(array_specification_c *symbol);
+//  void *visit(array_subrange_list_c *symbol);
+//  void *visit(array_initial_elements_list_c *symbol);
+//  void *visit(array_initial_elements_c *symbol);
+//  void *visit(structure_type_declaration_c *symbol);
+//  void *visit(initialized_structure_c *symbol);
+//  void *visit(structure_element_declaration_list_c *symbol);
+//  void *visit(structure_element_declaration_c *symbol);
+//  void *visit(structure_element_initialization_list_c *symbol);
+//  void *visit(structure_element_initialization_c *symbol);
+//  void *visit(string_type_declaration_c *symbol);
 
+    
     /*********************/
     /* B 1.4 - Variables */
     /*********************/

@@ -31,19 +31,6 @@
 
 
 
-elementary_type_c *elementary_type_c::singleton = NULL;
-
-const char *elementary_type_c::to_string(symbol_c *symbol) {
-  if (NULL == singleton)    singleton = new elementary_type_c;
-  if (NULL == singleton)    ERROR;
-  const char *res           = (const char *)symbol->accept(*singleton);
-  if (NULL == res)          ERROR;
-  return res;
-}
-
-
-
-
 
 /* Macro that expand to subtypes */
 /* copied from matiec/lib/create_standard_functions_txt.sh */
@@ -101,10 +88,10 @@ const char *elementary_type_c::to_string(symbol_c *symbol) {
 
 const struct widen_entry widen_ADD_table[] = {
 #define __add(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_NUM(__add)
 #undef __add
 
@@ -113,54 +100,54 @@ const struct widen_entry widen_ADD_table[] = {
     /*** Operations with TIME, DT and TOD... ***/
     /*******************************************/
     /*******************************************/ 
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::time_type_name,            &search_constant_type_c::time_type_name,         widen_entry::ok                 },
-    { &search_constant_type_c::tod_type_name,           &search_constant_type_c::time_type_name,            &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::time_type_name,            &get_datatype_info_c::time_type_name,         widen_entry::ok                 },
+    { &get_datatype_info_c::tod_type_name,           &get_datatype_info_c::time_type_name,            &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::time_type_name,          &search_constant_type_c::tod_type_name,             &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::dt_type_name,            &search_constant_type_c::time_type_name,            &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::tod_type_name,             &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::dt_type_name,            &get_datatype_info_c::time_type_name,            &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::time_type_name,          &search_constant_type_c::dt_type_name,              &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::dt_type_name,              &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
 
     /*******************************/
     /* SAFE version on the left... */
     /*******************************/
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::time_type_name,            &search_constant_type_c::time_type_name,         widen_entry::ok                 },
-    { &search_constant_type_c::safetod_type_name,       &search_constant_type_c::time_type_name,            &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::time_type_name,            &get_datatype_info_c::time_type_name,         widen_entry::ok                 },
+    { &get_datatype_info_c::safetod_type_name,       &get_datatype_info_c::time_type_name,            &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::tod_type_name,             &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safedt_type_name,        &search_constant_type_c::time_type_name,            &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::tod_type_name,             &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safedt_type_name,        &get_datatype_info_c::time_type_name,            &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::dt_type_name,              &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::dt_type_name,              &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
 
     /********************************/
     /* SAFE version on the right... */
     /********************************/
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::safetime_type_name,        &search_constant_type_c::time_type_name,         widen_entry::ok         },
-    { &search_constant_type_c::tod_type_name,           &search_constant_type_c::safetime_type_name,        &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::time_type_name,         widen_entry::ok         },
+    { &get_datatype_info_c::tod_type_name,           &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::time_type_name,          &search_constant_type_c::safetod_type_name,         &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::dt_type_name,            &search_constant_type_c::safetime_type_name,        &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::safetod_type_name,         &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::dt_type_name,            &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::time_type_name,          &search_constant_type_c::safedt_type_name,          &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::safedt_type_name,          &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },         
 
     /*************************************/
     /* SAFE version on left and right... */
     /*************************************/
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safetime_type_name,     widen_entry::ok                 },
-    { &search_constant_type_c::safetod_type_name,       &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safetod_type_name,      ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safetime_type_name,     widen_entry::ok                 },
+    { &get_datatype_info_c::safetod_type_name,       &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safetod_type_name,      ANYTIME_OPER_DEPRECATION_STATUS },
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::safetod_type_name,         &search_constant_type_c::safetod_type_name,      ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safedt_type_name,        &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safedt_type_name,       ANYTIME_OPER_DEPRECATION_STATUS },         
+//  { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::safetod_type_name,         &get_datatype_info_c::safetod_type_name,      ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safedt_type_name,        &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safedt_type_name,       ANYTIME_OPER_DEPRECATION_STATUS },         
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'addition' is supposed to be commutative, we add it anyway... */
     /* not currently supported by stage4, so it is best no tto add it for now... */
-//  { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::safedt_type_name,          &search_constant_type_c::safedt_type_name,       ANYTIME_OPER_DEPRECATION_STATUS },
+//  { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::safedt_type_name,          &get_datatype_info_c::safedt_type_name,       ANYTIME_OPER_DEPRECATION_STATUS },
    
     { NULL, NULL, NULL, widen_entry::ok },
 };
@@ -173,10 +160,10 @@ const struct widen_entry widen_ADD_table[] = {
 
 const struct widen_entry widen_SUB_table[] = {
 #define __sub(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_NUM(__sub)
 #undef __sub
 
@@ -185,42 +172,42 @@ const struct widen_entry widen_SUB_table[] = {
     /*** Operations with TIME, DT and TOD... ***/
     /*******************************************/
     /*******************************************/ 
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::time_type_name,            &search_constant_type_c::time_type_name,         widen_entry::ok                 },
-    { &search_constant_type_c::date_type_name,          &search_constant_type_c::date_type_name,            &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::tod_type_name,           &search_constant_type_c::time_type_name,            &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::tod_type_name,           &search_constant_type_c::tod_type_name,             &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::dt_type_name,            &search_constant_type_c::time_type_name,            &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::dt_type_name,            &search_constant_type_c::dt_type_name,              &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },        
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::time_type_name,            &get_datatype_info_c::time_type_name,         widen_entry::ok                 },
+    { &get_datatype_info_c::date_type_name,          &get_datatype_info_c::date_type_name,            &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::tod_type_name,           &get_datatype_info_c::time_type_name,            &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::tod_type_name,           &get_datatype_info_c::tod_type_name,             &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::dt_type_name,            &get_datatype_info_c::time_type_name,            &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::dt_type_name,            &get_datatype_info_c::dt_type_name,              &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },        
 
     /*******************************/
     /* SAFE version on the left... */
     /*******************************/
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::time_type_name,            &search_constant_type_c::time_type_name,         widen_entry::ok                 },
-    { &search_constant_type_c::safedate_type_name,      &search_constant_type_c::date_type_name,            &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safetod_type_name,       &search_constant_type_c::time_type_name,            &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safetod_type_name,       &search_constant_type_c::tod_type_name,             &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safedt_type_name,        &search_constant_type_c::time_type_name,            &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safedt_type_name,        &search_constant_type_c::dt_type_name,              &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },        
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::time_type_name,            &get_datatype_info_c::time_type_name,         widen_entry::ok                 },
+    { &get_datatype_info_c::safedate_type_name,      &get_datatype_info_c::date_type_name,            &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safetod_type_name,       &get_datatype_info_c::time_type_name,            &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safetod_type_name,       &get_datatype_info_c::tod_type_name,             &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safedt_type_name,        &get_datatype_info_c::time_type_name,            &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safedt_type_name,        &get_datatype_info_c::dt_type_name,              &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },        
 
     /********************************/
     /* SAFE version on the right... */
     /********************************/
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::safetime_type_name,        &search_constant_type_c::time_type_name,         widen_entry::ok                 },
-    { &search_constant_type_c::date_type_name,          &search_constant_type_c::safedate_type_name,        &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::tod_type_name,           &search_constant_type_c::safetime_type_name,        &search_constant_type_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::tod_type_name,           &search_constant_type_c::safetod_type_name,         &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::dt_type_name,            &search_constant_type_c::safetime_type_name,        &search_constant_type_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::dt_type_name,            &search_constant_type_c::safedt_type_name,          &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },        
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::time_type_name,         widen_entry::ok                 },
+    { &get_datatype_info_c::date_type_name,          &get_datatype_info_c::safedate_type_name,        &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::tod_type_name,           &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::tod_type_name,          ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::tod_type_name,           &get_datatype_info_c::safetod_type_name,         &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::dt_type_name,            &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::dt_type_name,           ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::dt_type_name,            &get_datatype_info_c::safedt_type_name,          &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS },        
 
     /*************************************/
     /* SAFE version on left and right... */
     /*************************************/
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safetime_type_name,     widen_entry::ok                 },
-    { &search_constant_type_c::safedate_type_name,      &search_constant_type_c::safedate_type_name,        &search_constant_type_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safetod_type_name,       &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safetod_type_name,      ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safetod_type_name,       &search_constant_type_c::safetod_type_name,         &search_constant_type_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safedt_type_name,        &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safedt_type_name,       ANYTIME_OPER_DEPRECATION_STATUS },
-    { &search_constant_type_c::safedt_type_name,        &search_constant_type_c::safedt_type_name,          &search_constant_type_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },        
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safetime_type_name,     widen_entry::ok                 },
+    { &get_datatype_info_c::safedate_type_name,      &get_datatype_info_c::safedate_type_name,        &get_datatype_info_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safetod_type_name,       &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safetod_type_name,      ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safetod_type_name,       &get_datatype_info_c::safetod_type_name,         &get_datatype_info_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safedt_type_name,        &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safedt_type_name,       ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::safedt_type_name,        &get_datatype_info_c::safedt_type_name,          &get_datatype_info_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },        
 
     { NULL, NULL, NULL, widen_entry::ok },
 };
@@ -233,10 +220,10 @@ const struct widen_entry widen_SUB_table[] = {
 
 const struct widen_entry widen_MUL_table[] = {
 #define __mul(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_NUM(__mul)
 #undef __mul
 
@@ -246,15 +233,15 @@ const struct widen_entry widen_MUL_table[] = {
     /*******************************************/
     /*******************************************/ 
 #define __multime(TYPE)       \
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS }, \
     /* NOTE: the standard des not explicitly support the following semantics. However, since 'multiplication' is supposed to be commutative, we add it anyway... */                 \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::time_type_name,            &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::time_type_name,            &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safetime_type_name,        &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safetime_type_name,        &search_constant_type_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::time_type_name,            &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::time_type_name,            &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safetime_type_name,        &get_datatype_info_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
     __ANY_NUM(__multime)
 #undef __multime
 
@@ -267,10 +254,10 @@ const struct widen_entry widen_MUL_table[] = {
 
 const struct widen_entry widen_DIV_table[] = {
 #define __div(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_NUM(__div)
 #undef __div
 
@@ -280,10 +267,10 @@ const struct widen_entry widen_DIV_table[] = {
     /*******************************************/
     /*******************************************/ 
 #define __divtime(TYPE)       \
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::time_type_name,          &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
-    { &search_constant_type_c::safetime_type_name,      &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::time_type_name,          &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::time_type_name,         ANYTIME_OPER_DEPRECATION_STATUS }, \
+    { &get_datatype_info_c::safetime_type_name,      &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safetime_type_name,     ANYTIME_OPER_DEPRECATION_STATUS },
     __ANY_NUM(__divtime)
 #undef __divtime
 
@@ -295,10 +282,10 @@ const struct widen_entry widen_DIV_table[] = {
 
 const struct widen_entry widen_MOD_table[] = {
 #define __mod(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_NUM(__mod)
 #undef __mod
 
@@ -310,10 +297,10 @@ const struct widen_entry widen_MOD_table[] = {
 
 const struct widen_entry widen_EXPT_table[] = {
 #define __expt(IN2TYPE, IN1TYPE)       \
-    { &search_constant_type_c::IN1TYPE##_type_name,        &search_constant_type_c::IN2TYPE##_type_name,          &search_constant_type_c::IN1TYPE##_type_name,       widen_entry::ok        }, \
-    { &search_constant_type_c::safe##IN1TYPE##_type_name,  &search_constant_type_c::IN2TYPE##_type_name,          &search_constant_type_c::IN1TYPE##_type_name,       widen_entry::ok        }, \
-    { &search_constant_type_c::IN1TYPE##_type_name,        &search_constant_type_c::safe##IN2TYPE##_type_name,    &search_constant_type_c::IN1TYPE##_type_name,       widen_entry::ok        }, \
-    { &search_constant_type_c::safe##IN1TYPE##_type_name,  &search_constant_type_c::safe##IN2TYPE##_type_name,    &search_constant_type_c::safe##IN1TYPE##_type_name, widen_entry::ok        },
+    { &get_datatype_info_c::IN1TYPE##_type_name,        &get_datatype_info_c::IN2TYPE##_type_name,          &get_datatype_info_c::IN1TYPE##_type_name,       widen_entry::ok        }, \
+    { &get_datatype_info_c::safe##IN1TYPE##_type_name,  &get_datatype_info_c::IN2TYPE##_type_name,          &get_datatype_info_c::IN1TYPE##_type_name,       widen_entry::ok        }, \
+    { &get_datatype_info_c::IN1TYPE##_type_name,        &get_datatype_info_c::safe##IN2TYPE##_type_name,    &get_datatype_info_c::IN1TYPE##_type_name,       widen_entry::ok        }, \
+    { &get_datatype_info_c::safe##IN1TYPE##_type_name,  &get_datatype_info_c::safe##IN2TYPE##_type_name,    &get_datatype_info_c::safe##IN1TYPE##_type_name, widen_entry::ok        },
 #define __IN2_anynum_(IN1_TYPENAME)   __ANY_NUM_1(__expt,IN1_TYPENAME)
     __ANY_REAL(__IN2_anynum_)
 #undef __expt
@@ -335,10 +322,10 @@ const struct widen_entry widen_EXPT_table[] = {
 /* table used by AND and ANDN operators, and and_expression */
 const struct widen_entry widen_AND_table[] = {
 #define __and(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_BIT(__and)
 #undef __and
 
@@ -348,10 +335,10 @@ const struct widen_entry widen_AND_table[] = {
 /* table used by OR and ORN operators, and or_expression */
 const struct widen_entry widen_OR_table[] = {
 #define __or(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_BIT(__or)
 #undef __or
 
@@ -362,10 +349,10 @@ const struct widen_entry widen_OR_table[] = {
 /* table used by XOR and XORN operators, and xor_expression */
 const struct widen_entry widen_XOR_table[] = {
 #define __xor(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::TYPE##_type_name,       widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safe##TYPE##_type_name, widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::TYPE##_type_name,       widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safe##TYPE##_type_name, widen_entry::ok                 },
     __ANY_BIT(__xor)
 #undef __xor
 
@@ -384,10 +371,10 @@ const struct widen_entry widen_XOR_table[] = {
 /* table used by GT, GE, EQ, LE, LT, and NE  operators, and equivalent ST expressions. */
 const struct widen_entry widen_CMP_table[] = {
 #define __cmp(TYPE)       \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::bool_type_name,         widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::TYPE##_type_name,          &search_constant_type_c::bool_type_name,         widen_entry::ok                 }, \
-    { &search_constant_type_c::TYPE##_type_name,        &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::bool_type_name,         widen_entry::ok                 }, \
-    { &search_constant_type_c::safe##TYPE##_type_name,  &search_constant_type_c::safe##TYPE##_type_name,    &search_constant_type_c::safebool_type_name,     widen_entry::ok                 },
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::bool_type_name,         widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::TYPE##_type_name,          &get_datatype_info_c::bool_type_name,         widen_entry::ok                 }, \
+    { &get_datatype_info_c::TYPE##_type_name,        &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::bool_type_name,         widen_entry::ok                 }, \
+    { &get_datatype_info_c::safe##TYPE##_type_name,  &get_datatype_info_c::safe##TYPE##_type_name,    &get_datatype_info_c::safebool_type_name,     widen_entry::ok                 },
     __ANY_ELEMENTARY(__cmp)
 #undef __cmp
 
@@ -403,7 +390,7 @@ int search_in_candidate_datatype_list(symbol_c *datatype, const std::vector <sym
 		return -1;
 
 	for(unsigned int i = 0; i < candidate_datatypes.size(); i++)
-		if (is_type_equal(datatype, candidate_datatypes[i]))
+		if (get_datatype_info_c::is_type_equal(datatype, candidate_datatypes[i]))
 			return i;
 	/* Not found ! */
 	return -1;
@@ -461,346 +448,6 @@ void intersect_prev_candidate_datatype_lists(il_instruction_c *symbol) {
 
 
 
-/* A helper function... */
-bool is_ANY_ELEMENTARY_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  return is_ANY_MAGNITUDE_type(type_symbol)
-      || is_ANY_BIT_type      (type_symbol)
-      || is_ANY_STRING_type   (type_symbol)
-      || is_ANY_DATE_type     (type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_SAFEELEMENTARY_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  return is_ANY_SAFEMAGNITUDE_type(type_symbol)
-      || is_ANY_SAFEBIT_type      (type_symbol)
-      || is_ANY_SAFESTRING_type   (type_symbol)
-      || is_ANY_SAFEDATE_type     (type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_ELEMENTARY_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  /* NOTE: doing
-   *          return is_ANY_SAFEELEMENTARY_type() || is_ANY_ELEMENTARY_type()
-   *       is incorrect, as the literals would never be considered compatible...
-   */
-  return is_ANY_MAGNITUDE_compatible(type_symbol)
-      || is_ANY_BIT_compatible      (type_symbol)
-      || is_ANY_STRING_compatible   (type_symbol)
-      || is_ANY_DATE_compatible     (type_symbol);
-}
-
-
-/* A helper function... */
-bool is_ANY_MAGNITUDE_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(time_type_name_c)) {return true;}
-  return is_ANY_NUM_type(type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_signed_MAGNITUDE_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(time_type_name_c)) {return true;}
-  return is_ANY_signed_NUM_type(type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_SAFEMAGNITUDE_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safetime_type_name_c)) {return true;}
-  return is_ANY_SAFENUM_type(type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_signed_SAFEMAGNITUDE_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safetime_type_name_c)) {return true;}
-  return is_ANY_signed_SAFENUM_type(type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_MAGNITUDE_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_MAGNITUDE_type    (type_symbol))              {return true;}
-  if (is_ANY_SAFEMAGNITUDE_type(type_symbol))              {return true;}
-  return is_ANY_NUM_compatible(type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_signed_MAGNITUDE_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_signed_MAGNITUDE_type    (type_symbol))       {return true;}
-  if (is_ANY_signed_SAFEMAGNITUDE_type(type_symbol))       {return true;}
-  return is_ANY_signed_NUM_compatible(type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_NUM_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_REAL_type(type_symbol))                       {return true;}
-  if (is_ANY_INT_type(type_symbol))                        {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_signed_NUM_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_REAL_type(type_symbol))                       {return true;}
-  if (is_ANY_signed_INT_type(type_symbol))                 {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_SAFENUM_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  return is_ANY_SAFEREAL_type(type_symbol)
-      || is_ANY_SAFEINT_type (type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_signed_SAFENUM_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  return is_ANY_SAFEREAL_type(type_symbol)
-      || is_ANY_signed_SAFEINT_type (type_symbol);
-}
-
-/* A helper function... */
-bool is_ANY_NUM_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_REAL_compatible(type_symbol))                       {return true;}
-  if (is_ANY_INT_compatible(type_symbol))                        {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_signed_NUM_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_REAL_compatible(type_symbol))                       {return true;}
-  if (is_ANY_signed_INT_compatible(type_symbol))                 {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_DATE_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(date_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(tod_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(dt_type_name_c))   {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_SAFEDATE_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safedate_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(safetod_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safedt_type_name_c))   {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_DATE_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_DATE_type    (type_symbol))              {return true;}
-  if (is_ANY_SAFEDATE_type(type_symbol))              {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_STRING_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(string_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(wstring_type_name_c)) {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_SAFESTRING_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safestring_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(safewstring_type_name_c)) {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_STRING_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_STRING_type    (type_symbol))              {return true;}
-  if (is_ANY_SAFESTRING_type(type_symbol))              {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_INT_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(sint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(int_type_name_c))   {return true;}
-  if (typeid(*type_symbol) == typeid(dint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(lint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(usint_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(uint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(udint_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(ulint_type_name_c)) {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_signed_INT_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(sint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(int_type_name_c))   {return true;}
-  if (typeid(*type_symbol) == typeid(dint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(lint_type_name_c))  {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_signed_SAFEINT_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safesint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safeint_type_name_c))   {return true;}
-  if (typeid(*type_symbol) == typeid(safedint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safelint_type_name_c))  {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_SAFEINT_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safesint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safeint_type_name_c))   {return true;}
-  if (typeid(*type_symbol) == typeid(safedint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safelint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safeusint_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(safeuint_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safeudint_type_name_c)) {return true;}
-  if (typeid(*type_symbol) == typeid(safeulint_type_name_c)) {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_signed_INT_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_signed_INT_type    (type_symbol))              {return true;}
-  if (is_ANY_signed_SAFEINT_type(type_symbol))              {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_INT_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_INT_type    (type_symbol))              {return true;}
-  if (is_ANY_SAFEINT_type(type_symbol))              {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_REAL_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(real_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(lreal_type_name_c)) {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_SAFEREAL_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safereal_type_name_c))  {return true;}
-  if (typeid(*type_symbol) == typeid(safelreal_type_name_c)) {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_REAL_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_REAL_type    (type_symbol))              {return true;}
-  if (is_ANY_SAFEREAL_type(type_symbol))              {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_BIT_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(bool_type_name_c))     {return true;}
-  if (typeid(*type_symbol) == typeid(byte_type_name_c))     {return true;}
-  if (typeid(*type_symbol) == typeid(word_type_name_c))     {return true;}
-  if (typeid(*type_symbol) == typeid(dword_type_name_c))    {return true;}
-  if (typeid(*type_symbol) == typeid(lword_type_name_c))    {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_SAFEBIT_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safebool_type_name_c))     {return true;}
-  if (typeid(*type_symbol) == typeid(safebyte_type_name_c))     {return true;}
-  if (typeid(*type_symbol) == typeid(safeword_type_name_c))     {return true;}
-  if (typeid(*type_symbol) == typeid(safedword_type_name_c))    {return true;}
-  if (typeid(*type_symbol) == typeid(safelword_type_name_c))    {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_BIT_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_ANY_BIT_type    (type_symbol))              {return true;}
-  if (is_ANY_SAFEBIT_type(type_symbol))              {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_BOOL_type(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(bool_type_name_c))      {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_SAFEBOOL_type(symbol_c *type_symbol){
-  if (type_symbol == NULL) {return false;}
-  if (typeid(*type_symbol) == typeid(safebool_type_name_c))  {return true;}
-  return false;
-}
-
-/* A helper function... */
-bool is_ANY_BOOL_compatible(symbol_c *type_symbol) {
-  if (type_symbol == NULL) {return false;}
-  if (is_BOOL_type    (type_symbol))              {return true;}
-  if (is_SAFEBOOL_type(type_symbol))              {return true;}
-  return false;
-}
 
 
 
-
-
-bool is_type_equal(symbol_c *first_type, symbol_c *second_type) {
-  if ((NULL == first_type) || (NULL == second_type))
-      return false;
-  if (typeid(* first_type) == typeid(invalid_type_name_c))
-      return false;
-  if (typeid(*second_type) == typeid(invalid_type_name_c))
-      return false;
-    
-  if (is_ANY_ELEMENTARY_type(first_type)) {
-      if (typeid(*first_type) == typeid(*second_type))
-          return true;
-  } else   /* ANY_DERIVED */
-      return (first_type == second_type);
-
-  return false;
-}
-
-
-
-bool is_type_valid(symbol_c *type) {
-  if (NULL == type)
-      return false;
-  if (typeid(*type) == typeid(invalid_type_name_c))
-      return false;
-
-  return true;
-}

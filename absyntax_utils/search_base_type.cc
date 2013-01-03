@@ -49,49 +49,64 @@
 #include "../main.hh" // required for ERROR() and ERROR_MSG() macros.
 
 
-
-search_base_type_c::search_base_type_c(void) {current_type_name = NULL;}
-
-
+/* pointer to singleton instance */
+search_base_type_c *search_base_type_c::search_base_type_singleton = NULL;
 
 
-symbol_c *search_base_type_c::get_basetype_decl(symbol_c *symbol) {
-  if (NULL == symbol)
-    return NULL;
-  
-  return (symbol_c *)symbol->accept(*this);
+
+search_base_type_c::search_base_type_c(void) {current_type_name = NULL; current_basetype = NULL;}
+
+/* static method! */
+void search_base_type_c::create_singleton(void) {
+  if (NULL == search_base_type_singleton)   search_base_type_singleton = new search_base_type_c();
+  if (NULL == search_base_type_singleton)   ERROR;
 }
 
+/* static method! */
+symbol_c *search_base_type_c::get_basetype_decl(symbol_c *symbol) {
+  create_singleton();
+  if (NULL == symbol)    return NULL; 
+  search_base_type_singleton->current_type_name = NULL;
+  search_base_type_singleton->current_basetype  = NULL; 
+  return (symbol_c *)symbol->accept(*search_base_type_singleton);
+}
+
+/* static method! */
 symbol_c *search_base_type_c::get_basetype_id  (symbol_c *symbol) {
-  if (NULL == symbol)
-    return NULL;
-  
-  current_type_name = NULL; /* just to be on the safe side... */
-  symbol->accept(*this);
-  return (symbol_c *)current_type_name;
+  create_singleton();
+  if (NULL == symbol)    return NULL; 
+  search_base_type_singleton->current_type_name = NULL;
+  search_base_type_singleton->current_basetype  = NULL; 
+  symbol->accept(*search_base_type_singleton);
+  return (symbol_c *)search_base_type_singleton->current_type_name;
 }
 
 
 /* Note by MJS: The following two functions definately do not belong in this class!! Maybe create a new utility class?
  * I will need to clean this up when the opportunity arises!
  */
-
+/* static method! */
 bool search_base_type_c::type_is_subrange(symbol_c* type_decl) {
-  this->is_subrange = false;
-  type_decl->accept(*this);
-  return this->is_subrange;
+  create_singleton();
+  search_base_type_singleton->is_subrange = false;
+  type_decl->accept(*search_base_type_singleton);
+  return search_base_type_singleton->is_subrange;
 }
 
+
+/* static method! */
 bool search_base_type_c::type_is_enumerated(symbol_c* type_decl) {
-  this->is_enumerated = false;
-  type_decl->accept(*this);
-  return this->is_enumerated;
+  create_singleton();
+  search_base_type_singleton->is_enumerated = false;
+  type_decl->accept(*search_base_type_singleton);
+  return search_base_type_singleton->is_enumerated;
 }
 
 bool search_base_type_c::type_is_fb(symbol_c* type_decl) {
-  this->is_fb = false;
-  type_decl->accept(*this);
-  return this->is_fb;
+  create_singleton();
+  search_base_type_singleton->is_fb = false;
+  type_decl->accept(*search_base_type_singleton);
+  return search_base_type_singleton->is_fb;
 }
 
 /*************************/
@@ -105,6 +120,10 @@ void *search_base_type_c::visit(identifier_c *type_name) {
   symbol_c *type_decl;
 
   this->current_type_name = type_name;
+  /* if we have reached this point, it is because the current_basetype is not yet pointing to the base datatype we are looking for,
+   * so we will be searching for the delcaration of the type named in type_name, which might be the base datatype (we search recursively!)
+   */
+  this->current_basetype  = NULL; 
   
   /* look up the type declaration... */
   type_decl = type_symtable.find_value(type_name);
@@ -237,18 +256,38 @@ void *search_base_type_c::visit(subrange_c *symbol)                             
 /*  enumerated_type_name ':' enumerated_spec_init */
 void *search_base_type_c::visit(enumerated_type_declaration_c *symbol) {
   this->current_type_name = symbol->enumerated_type_name;
+  /* NOTE: We want search_base_type_c to return a enumerated_type_declaration_c as the base datatpe if possible
+   *       (i.e. if it is a named datatype declared inside a TYPE ... END_TYPE declarations, as opposed to an
+   *        anonymous datatype declared in a VAR ... AND_VAR declaration).
+   *       However, we cannot return this symbol just yet, as it may not be the final base datatype.
+   *       So we store it in a temporary current_basetype variable!
+   */
+  this->current_basetype  = symbol; 
   return symbol->enumerated_spec_init->accept(*this);
 }
 
 /* enumerated_specification ASSIGN enumerated_value */
 void *search_base_type_c::visit(enumerated_spec_init_c *symbol) {
   this->is_enumerated = true;
-  return symbol->enumerated_specification->accept(*this);
+  // current_basetype may have been set in the previous enumerated_type_declaration_c visitor, in which case we do not want to overwrite the value!
+  if (NULL == this->current_basetype)
+    this->current_basetype  = symbol; 
+  /* NOTE: the following line may call either the visitor to 
+   *         - identifier_c, in which case this is not yet the base datatype we are looking for (it will set current_basetype to NULL!)
+   *         - enumerated_value_list_c, in which case we have found the base datatype.
+   */
+  return symbol->enumerated_specification->accept(*this); 
 }
 
 /* helper symbol for enumerated_specification->enumerated_spec_init */
 /* enumerated_value_list ',' enumerated_value */
-void *search_base_type_c::visit(enumerated_value_list_c *symbol)                        {return (void *)symbol;}
+void *search_base_type_c::visit(enumerated_value_list_c *symbol) {
+  this->is_enumerated = true;
+  // current_basetype may have been set in the previous enumerated_type_declaration_c or enumerated_spec_init_c visitors, in which case we do not want to overwrite the value!
+  if (NULL == this->current_basetype) 
+    this->current_basetype  = symbol; 
+  return (void *)current_basetype;
+}
 
 /* enumerated_type_name '#' identifier */
 // SYM_REF2(enumerated_value_c, type, value)

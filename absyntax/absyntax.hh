@@ -48,6 +48,7 @@
 
 #include <stdio.h> // required for NULL
 #include <vector>
+#include <map>
 #include <string>
 #include <stdint.h>  // required for uint64_t, etc...
 #include "../main.hh" // required for uint8_t, real_64_t, ..., and the macros INT8_MAX, REAL32_MAX, ... */
@@ -72,6 +73,28 @@ class symbol_c; // forward declaration
 
 
 
+/* Case insensitive string compare */
+  /* Case insensitive string compare copied from
+   * "The C++ Programming Language" - 3rd Edition
+   * by Bjarne Stroustrup, ISBN 0201889544.
+   */
+class nocasecmp_c {
+    public:
+      bool operator() (const std::string& x, const std::string& y) const {
+        std::string::const_iterator ix = x.begin();
+        std::string::const_iterator iy = y.begin();
+
+        for(; (ix != x.end()) && (iy != y.end()) && (toupper(*ix) == toupper(*iy)); ++ix, ++iy);
+        if (ix == x.end()) return (iy != y.end());
+        if (iy == y.end()) return false;
+        return (toupper(*ix) < toupper(*iy));
+      };
+  };
+
+
+
+
+
 
 
 
@@ -80,6 +103,9 @@ class symbol_c; // forward declaration
 class symbol_c {
 
   public:
+    /* WARNING: only use this method for debugging purposes!! */
+    virtual const char *absyntax_cname(void) {return "symbol_c";};
+
     /*
      * Line number for the purposes of error checking.
      * Annotated (inserted) by stage1_2
@@ -96,7 +122,7 @@ class symbol_c {
 
     /*
      * Annotations produced during stage 3
-     */
+     */    
     /*** Data type analysis ***/
     std::vector <symbol_c *> candidate_datatypes; /* All possible data types the expression/literal/etc. may take. Filled in stage3 by fill_candidate_datatypes_c class */
     /* Data type of the expression/literal/etc. Filled in stage3 by narrow_candidate_datatypes_c 
@@ -117,15 +143,15 @@ class symbol_c {
      * having more than one entry filled in!
      */
     typedef enum { cs_undefined,   /* not defined/not yet evaluated --> const_value is not valid! */
-                   cs_non_const,   /* we have deternmined that expression is not a const value --> const_value is not valid! */
+                   cs_non_const,   /* we have determined that expression is not a const value --> const_value is not valid! */
                    cs_const_value, /* const value is valid */
                    cs_overflow     /* result produced overflow or underflow --> const_value is not valid! */
                  } const_status_t;
  
-    typedef struct {const_status_t status;  real64_t  value; } const_value_real64_t;
-    typedef struct {const_status_t status;   int64_t  value; } const_value_int64_t;
-    typedef struct {const_status_t status;  uint64_t  value; } const_value_uint64_t;
-    typedef struct {const_status_t status;      bool  value; } const_value_bool_t;
+    typedef struct const_value_real64_s {const_status_t status;  real64_t  value;  const_value_real64_s (): status(cs_undefined), value(0.0)   {} } const_value_real64_t;
+    typedef struct const_value_int64_s  {const_status_t status;   int64_t  value;  const_value_int64_s  (): status(cs_undefined), value(0)     {} } const_value_int64_t;
+    typedef struct const_value_uint64_s {const_status_t status;  uint64_t  value;  const_value_uint64_s (): status(cs_undefined), value(0)     {} } const_value_uint64_t;
+    typedef struct const_value_bool_s   {const_status_t status;      bool  value;  const_value_bool_s   (): status(cs_undefined), value(false) {} } const_value_bool_t;
 
     typedef struct {
       const_value_real64_t _real64; /* status is initialised to UNDEFINED */
@@ -134,6 +160,12 @@ class symbol_c {
       const_value_bool_t     _bool; /* status is initialised to UNDEFINED */
     } const_value_t;
     const_value_t const_value;
+    
+    /*** Enumeration datatype checking ***/    
+    /* Not all symbols will contain the following anotations, which is why they are not declared here in symbol_c
+     * They will be declared only inside the symbols that require them (have a look at absyntax.def)
+     */
+    typedef std::multimap<std::string, symbol_c *, nocasecmp_c> enumvalue_symtable_t;
     
 
   public:
@@ -150,8 +182,13 @@ class symbol_c {
 };
 
 
+
+
 class token_c: public symbol_c {
   public:
+    /* WARNING: only use this method for debugging purposes!! */
+    virtual const char *absyntax_cname(void) {return "token_c";};
+
     /* the value of the symbol. */
     const char *value;
 
@@ -163,10 +200,15 @@ class token_c: public symbol_c {
 };
 
 
+
+
  /* a list of symbols... */
 class list_c: public symbol_c {
   public:
-    int n;
+    /* WARNING: only use this method for debugging purposes!! */
+    virtual const char *absyntax_cname(void) {return "list_c";};
+
+    int c,n; /* c: current capacity of list (malloc'd memory);  n: current number of elements in list */
     symbol_c **elements;
 
   public:
@@ -191,6 +233,11 @@ class list_c: public symbol_c {
 
 
 
+
+
+
+
+
 #define SYM_LIST(class_name_c, ...)											\
 class class_name_c:	public list_c {											\
   public:														\
@@ -203,6 +250,8 @@ class class_name_c:	public list_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -215,6 +264,8 @@ class class_name_c: 	public token_c {										\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -227,6 +278,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -240,6 +293,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -255,6 +310,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -272,6 +329,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -291,6 +350,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -312,6 +373,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 
@@ -335,6 +398,8 @@ class class_name_c: public symbol_c {											\
                  int fl = 0, int fc = 0, const char *ffile = NULL /* filename */, long int forder=0,			\
                  int ll = 0, int lc = 0, const char *lfile = NULL /* filename */, long int lorder=0);			\
     virtual void *accept(visitor_c &visitor);										\
+    /* WARNING: only use this method for debugging purposes!! */							\
+    virtual const char *absyntax_cname(void) {return #class_name_c;};							\
 };
 
 

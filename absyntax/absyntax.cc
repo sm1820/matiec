@@ -76,45 +76,57 @@ token_c::token_c(const char *value,
 
 
 
-
+# define LIST_CAP_INIT 8
+# define LIST_CAP_INCR 8
 
 list_c::list_c(
                int fl, int fc, const char *ffile, long int forder,
                int ll, int lc, const char *lfile, long int lorder)
-  :symbol_c(fl, fc, ffile, forder, ll, lc, lfile, lorder) {
+  :symbol_c(fl, fc, ffile, forder, ll, lc, lfile, lorder),c(LIST_CAP_INIT) {
   n = 0;
-  elements = NULL;
+  elements = (symbol_c**)malloc(LIST_CAP_INIT*sizeof(symbol_c*));
+  if (NULL == elements) ERROR_MSG("out of memory");
 }
+
 
 list_c::list_c(symbol_c *elem, 
                int fl, int fc, const char *ffile, long int forder,
                int ll, int lc, const char *lfile, long int lorder)
-  :symbol_c(fl, fc, ffile, forder, ll, lc, lfile, lorder) {
+  :symbol_c(fl, fc, ffile, forder, ll, lc, lfile, lorder),c(LIST_CAP_INIT) { 
   n = 0;
-  elements = NULL;
-  add_element(elem);
+  elements = (symbol_c**)malloc(LIST_CAP_INIT*sizeof(symbol_c*));
+  if (NULL == elements) ERROR_MSG("out of memory");
+  add_element(elem); 
 }
+
 
 /* append a new element to the end of the list */
 void list_c::add_element(symbol_c *elem) {
-//printf("list_c::add_element()\n");
-  n++;
-  elements = (symbol_c **)realloc(elements, n * sizeof(symbol_c *));
-  if (elements == NULL)
-    ERROR_MSG("Out of memory");
-  elements[n - 1] = elem;
+  // printf("list_c::add_element()\n");
+  if (c <= n)
+    if (!(elements=(symbol_c**)realloc(elements,(c+=LIST_CAP_INCR)*sizeof(symbol_c *))))
+      ERROR_MSG("out of memory");
+  elements[n++] = elem;
  
-  if (elem == NULL)
-    return;
+  if (NULL == elem) return;
 
   /* adjust the location parameters, taking into account the new element. */
-  if ((first_line == elem->first_line) &&
-      (first_column > elem->first_column)) {
+  if (NULL == first_file) {
+    first_file = elem->first_file;
+    first_line = elem->first_line;
+    first_column = elem->first_column;
+  }
+  if ((first_line == elem->first_line) && (first_column > elem->first_column)) {
     first_column = elem->first_column;
   }
   if (first_line > elem->first_line) {
     first_line = elem->first_line;
     first_column = elem->first_column;
+  }
+  if (NULL == last_file) {
+    last_file = elem->last_file;
+    last_line = elem->last_line;
+    last_column = elem->last_column;
   }
   if ((last_line == elem->last_line) &&
       (last_column < elem->last_column)) {
@@ -130,26 +142,28 @@ void list_c::add_element(symbol_c *elem) {
 /* To insert into the begining of list, call with pos=0  */
 /* To insert into the end of list, call with pos=list->n */
 void list_c::insert_element(symbol_c *elem, int pos) {
-  if (pos > n) ERROR;
+  if((pos<0) || (n<pos)) ERROR;
   
   /* add new element to end of list. Basically alocate required memory... */
   /* will also increment n by 1 ! */
   add_element(elem);
   /* if not inserting into end position, shift all elements up one position, to open up a slot in pos for new element */
-  if (pos < (n-1)) for (int i = n-2; i >= pos; i--) elements[i+1] = elements[i];
-  elements[pos] = elem;
+  if(pos < (n-1)){ 
+    for(int i=n-2 ; i>=pos ; --i) elements[i+1] = elements[i];
+    elements[pos] = elem;
+  }
 }
 
 
 /* remove element at position pos. */
 void list_c::remove_element(int pos) {
-  if (pos > n) ERROR;
+  if((pos<0) || (n<=pos)) ERROR;
   
   /* Shift all elements down one position, starting at the entry to delete. */
   for (int i = pos; i < n-1; i++) elements[i] = elements[i+1];
-  /* corrent the new size, and free unused memory */
+  /* corrent the new size */
   n--;
-  elements = (symbol_c **)realloc(elements, n * sizeof(symbol_c *));
+  /* elements = (symbol_c **)realloc(elements, n * sizeof(symbol_c *)); */
 }
 
 #define SYM_LIST(class_name_c, ...)								\

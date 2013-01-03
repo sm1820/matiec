@@ -53,6 +53,10 @@
  *  then a datatype error has been found, and the datatype is either left at NULL, or set to a pointer of an invalid_type_name_c object!
  */
 
+#ifndef _NARROW_CANDIDATE_DATATYPES_HH
+#define _NARROW_CANDIDATE_DATATYPES_HH
+
+
 
 #include "../absyntax_utils/absyntax_utils.hh"
 #include "datatype_functions.hh"
@@ -61,11 +65,9 @@ class narrow_candidate_datatypes_c: public iterator_visitor_c {
 
   private:
     search_varfb_instance_type_c *search_varfb_instance_type;
-    search_base_type_c search_base_type;
     symbol_c *il_operand;
     il_instruction_c *fake_prev_il_instruction;
-    std::vector <symbol_c *> *prev_il_instructions;
-    std::vector <symbol_c *> *prev_il_instructions_intersected_datatypes;
+    il_instruction_c   *current_il_instruction;
 
     bool is_widening_compatible(const struct widen_entry widen_table[], symbol_c *left_type, symbol_c *right_type, symbol_c *result_type, bool *deprecated_status = NULL);
 
@@ -75,8 +77,9 @@ class narrow_candidate_datatypes_c: public iterator_visitor_c {
     void *narrow_implicit_il_fb_call(symbol_c *il_instruction, const char *param_name, symbol_c *&called_fb_declaration);
 
     void *handle_il_instruction(symbol_c *symbol);
-    void *narrow_binary_operator  (const struct widen_entry widen_table[], symbol_c *symbol,                                     bool *deprecated_operation = NULL);
-    void *narrow_binary_expression(const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr, bool *deprecated_operation = NULL);
+    void *narrow_binary_operator    (const struct widen_entry widen_table[], symbol_c *symbol,                                     bool *deprecated_operation = NULL);
+    void *narrow_binary_expression  (const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr, bool *deprecated_operation = NULL, bool allow_enums = false);
+    void *narrow_equality_comparison(const struct widen_entry widen_table[], symbol_c *symbol, symbol_c *l_expr, symbol_c *r_expr, bool *deprecated_operation = NULL);
 
     void *narrow_conditional_flow_control_IL_instruction(symbol_c *symbol);
 
@@ -93,8 +96,31 @@ class narrow_candidate_datatypes_c: public iterator_visitor_c {
     /********************************/
     /* B 1.3.3 - Derived data types */
     /********************************/
-    void *visit(subrange_c *symbol);
+//  void *visit(data_type_declaration_c *symbol);   /* Not required. already handled by iterator_visitor_c base class */
+//  void *visit(type_declaration_list_c *symbol);   /* Not required. already handled by iterator_visitor_c base class */
+//  void *visit(simple_type_declaration_c *symbol); /* Not required. already handled by iterator_visitor_c base class */
     void *visit(simple_spec_init_c *symbol);
+//  void *visit(subrange_type_declaration_c *symbol);
+//  void *visit(subrange_spec_init_c *symbol);
+//  void *visit(subrange_specification_c *symbol);
+    void *visit(subrange_c *symbol);
+    void *visit(enumerated_type_declaration_c *symbol);
+    void *visit(enumerated_spec_init_c *symbol);
+    void *visit(enumerated_value_list_c *symbol);
+//  void *visit(enumerated_value_c *symbol);        /* Not required */
+//  void *visit(array_type_declaration_c *symbol);
+//  void *visit(array_spec_init_c *symbol);
+//  void *visit(array_specification_c *symbol);
+//  void *visit(array_subrange_list_c *symbol);
+//  void *visit(array_initial_elements_list_c *symbol);
+//  void *visit(array_initial_elements_c *symbol);
+//  void *visit(structure_type_declaration_c *symbol);
+//  void *visit(initialized_structure_c *symbol);
+//  void *visit(structure_element_declaration_list_c *symbol);
+//  void *visit(structure_element_declaration_c *symbol);
+//  void *visit(structure_element_initialization_list_c *symbol);
+//  void *visit(structure_element_initialization_c *symbol);
+//  void *visit(string_type_declaration_c *symbol);
 
     /*********************/
     /* B 1.4 - Variables */
@@ -264,7 +290,7 @@ class narrow_candidate_datatypes_c: public iterator_visitor_c {
 
 
 
-
+#endif // #ifndef _NARROW_CANDIDATE_DATATYPES_HH
 
 
 

@@ -132,11 +132,10 @@ search_var_instance_decl_c::opt_t search_var_instance_decl_c::get_option(symbol_
 #include <typeinfo>  /* required for typeid() */
 bool search_var_instance_decl_c::type_is_complex(symbol_c *symbol) {
   symbol_c *decl;
-  search_base_type_c search_base_type;
   
   decl = this->get_decl(symbol);
   if (NULL == decl) ERROR;
-  decl = search_base_type.get_basetype_decl(decl);
+  decl = search_base_type_c::get_basetype_decl(decl);
   if (NULL == decl) ERROR;
   
   return ((typeid( *(decl) ) == typeid( array_specification_c                )) ||
@@ -145,7 +144,7 @@ bool search_var_instance_decl_c::type_is_complex(symbol_c *symbol) {
           (typeid( *(decl) ) == typeid( structure_element_declaration_list_c )) ||
 //        (typeid( *(decl) ) == typeid( structure_type_declaration_c         )) ||  /* does not seem to be necessary */
           (typeid( *(decl) ) == typeid( initialized_structure_c              )) ||
-          (search_base_type.type_is_fb(decl) && current_vartype == external_vt)
+          (search_base_type_c::type_is_fb(decl) && current_vartype == external_vt)
          );
 }
 

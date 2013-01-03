@@ -1,7 +1,7 @@
 /*
  *  matiec - a compiler for the programming languages defined in IEC 61131-3
  *
- *  Copyright (C) 2003-2011  Mario de Sousa (msousa@fe.up.pt)
+ *  Copyright (C) 2003-2012  Mario de Sousa (msousa@fe.up.pt)
  *  Copyright (C) 2007-2011  Laurent Bessard and Edouard Tisserant
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -37,39 +37,6 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
     } variablegeneration_t;
 
   private:
-
-    /* The initial value that should be given to the IL default variable
-     * imediately after a parenthesis is opened.
-     * This variable is only used to pass data from the
-     * il_expression_c visitor to the simple_instr_list_c visitor.
-     *
-     * e.g.:
-     *         LD var1
-     *         AND ( var2
-     *         OR var3
-     *         )
-     *
-     * In the above code sample, the line 'AND ( var2' constitutes
-     * an il_expression_c, where var2 should be loaded into the
-     * il default variable before continuing with the expression
-     * inside the parenthesis.
-     * Unfortunately, only the simple_instr_list_c may do the
-     * initial laoding of the var2 bariable following the parenthesis,
-     * so the il_expression_c visitor will have to pass 'var2' as a
-     * parameter to the simple_instr_list_c visitor.
-     * Ergo, the existance of the following parameter...!
-     */
-    symbol_c *il_default_variable_init_value;
-
-    /* Operand to the IL operation currently being processed... */
-    /* These variables are used to pass data from the
-     * il_simple_operation_c and il_expression_c visitors
-     * to the il operator visitors (i.e. LD_operator_c,
-     * LDN_operator_c, ST_operator_c, STN_operator_c, ...)
-     */
-    symbol_c *current_operand;
-    symbol_c *current_operand_type;
-
      /* The result of the comparison IL operations (GT, EQ, LT, ...)
      * is a boolean variable.
      * This class keeps track of the current data type stored in the
@@ -94,8 +61,7 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
      * scope ...
      */
     #define IL_DEFVAR_BACK   VAR_LEADER "IL_DEFVAR_BACK"
-    il_default_variable_c default_variable_name;
-    il_default_variable_c default_variable_back_name;
+    il_default_variable_c implicit_variable_current;
 
     symbol_c* current_array_type;
 
@@ -103,29 +69,20 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
     bool generating_inlinefunction;
     symbol_c *fbname;
 
-    search_expression_type_c *search_expression_type;
-
     search_varfb_instance_type_c *search_varfb_instance_type;
     search_var_instance_decl_c   *search_var_instance_decl;
-
-    search_base_type_c search_base_type;
 
     variablegeneration_t wanted_variablegeneration;
 
   public:
     generate_c_inlinefcall_c(stage4out_c *s4o_ptr, symbol_c *name, symbol_c *scope, const char *variable_prefix = NULL)
     : generate_c_typedecl_c(s4o_ptr),
-      default_variable_name(IL_DEFVAR, NULL),
-      default_variable_back_name(IL_DEFVAR_BACK, NULL)
+      implicit_variable_current(IL_DEFVAR, NULL)
     {
-      search_expression_type = new search_expression_type_c(scope);
       search_varfb_instance_type = new search_varfb_instance_type_c(scope);
-      search_var_instance_decl   = new search_var_instance_decl_c(scope);
+      search_var_instance_decl   = new search_var_instance_decl_c  (scope);
       
       this->set_variable_prefix(variable_prefix);
-      current_operand = NULL;
-      current_operand_type = NULL;
-      il_default_variable_init_value = NULL;
       fcall_number = 0;
       fbname = name;
       wanted_variablegeneration = expression_vg;
@@ -133,7 +90,6 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
     }
 
     virtual ~generate_c_inlinefcall_c(void) {
-      delete search_expression_type;
       delete search_varfb_instance_type;
       delete search_var_instance_decl;
     }
@@ -158,9 +114,9 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       generating_inlinefunction = true;
 
       fcall_number++;
-      function_type_prefix = search_expression_type->default_literal_type(function_type_prefix);
+      function_type_prefix = default_literal_type(function_type_prefix);
       if (function_type_suffix) {
-        function_type_suffix = search_expression_type->default_literal_type(function_type_suffix);
+        function_type_suffix = default_literal_type(function_type_suffix);
       }
 
       s4o.print(s4o.indent_spaces);
@@ -185,7 +141,7 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
 
       PARAM_LIST_ITERATOR() {
         if (PARAM_DIRECTION == function_param_iterator_c::direction_in) {
-          search_expression_type->default_literal_type(PARAM_TYPE)->accept(*this);
+          default_literal_type(PARAM_TYPE)->accept(*this);
           s4o.print(" ");
           PARAM_NAME->accept(*this);
           s4o.print(",\n" + s4o.indent_spaces);
@@ -271,46 +227,18 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
     }
 
   private:
-
-    /* A helper function... */
-    void CMP_operator_result_type() {
-      /* the data type resulting from this operation... */
-      this->default_variable_name.current_type = &(this->bool_type);
+    /* a small helper function */
+    symbol_c *default_literal_type(symbol_c *symbol) {
+      if (get_datatype_info_c::is_ANY_INT_literal(symbol)) {
+        return &get_datatype_info_c::lint_type_name;
+      }
+      else if (get_datatype_info_c::is_ANY_REAL_literal(symbol)) {
+        return &get_datatype_info_c::lreal_type_name;
+      }
+      return symbol;
     }
 
-    /* A helper function... */
-    void BYTE_operator_result_type(void) {
-      if (search_expression_type->is_literal_integer_type(this->default_variable_name.current_type)) {
-        if (search_expression_type->is_literal_integer_type(this->current_operand_type))
-          this->default_variable_name.current_type = &(this->lword_type);
-        else
-          this->default_variable_name.current_type = this->current_operand_type;
-      }
-      else if (search_expression_type->is_literal_integer_type(this->current_operand_type))
-          this->current_operand_type = this->default_variable_name.current_type;
-    }
 
-    /* A helper function... */
-    void NUM_operator_result_type(void) {
-      if (search_expression_type->is_literal_real_type(this->default_variable_name.current_type)) {
-        if (search_expression_type->is_literal_integer_type(this->current_operand_type) ||
-            search_expression_type->is_literal_real_type(this->current_operand_type))
-          this->default_variable_name.current_type = &(this->lreal_type);
-        else
-          this->default_variable_name.current_type = this->current_operand_type;
-      }
-      else if (search_expression_type->is_literal_integer_type(this->default_variable_name.current_type)) {
-        if (search_expression_type->is_literal_integer_type(this->current_operand_type))
-          this->default_variable_name.current_type = &(this->lint_type);
-        else if (search_expression_type->is_literal_real_type(this->current_operand_type))
-          this->default_variable_name.current_type = &(this->lreal_type);
-        else
-          this->default_variable_name.current_type = this->current_operand_type;
-      }
-      else if (search_expression_type->is_literal_integer_type(this->current_operand_type) ||
-               search_expression_type->is_literal_real_type(this->current_operand_type))
-        this->current_operand_type = this->default_variable_name.current_type;
-    }
 
     void *print_getter(symbol_c *symbol) {
       unsigned int vartype = search_var_instance_decl->get_vartype(symbol);
@@ -338,8 +266,8 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
     }
 
     void *print_setter(symbol_c* symbol,
-            symbol_c* type,
-            symbol_c* value) {
+                       symbol_c* type,
+                       symbol_c* value) {
       unsigned int vartype = search_var_instance_decl->get_vartype(symbol);
       if (vartype == search_var_instance_decl_c::external_vt) {
         if (search_var_instance_decl->type_is_fb(symbol))
@@ -472,29 +400,21 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
     /* | label ':' [il_incomplete_instruction] eol_list */
     // SYM_REF2(il_instruction_c, label, il_instruction)
     void *visit(il_instruction_c *symbol) {
-      if (NULL != symbol->il_instruction) {
-        symbol->il_instruction->accept(*this);
-      }
+      /* all previous IL instructions should have the same datatype (checked in stage3), so we get the datatype from the first previous IL instruction we find */
+      implicit_variable_current.datatype = (symbol->prev_il_instruction.empty())? NULL : symbol->prev_il_instruction[0]->datatype;
+      if (NULL != symbol->il_instruction)  symbol->il_instruction->accept(*this); 
+      implicit_variable_current.datatype = NULL;
       return NULL;
     }
+
 
     /* | il_simple_operator [il_operand] */
     //SYM_REF2(il_simple_operation_c, il_simple_operator, il_operand)
     void *visit(il_simple_operation_c *symbol) {
-      this->current_operand = symbol->il_operand;
-      if (NULL == this->current_operand) {
-        this->current_operand_type = NULL;
-      } else {
-        this->current_operand_type = search_expression_type->get_type(this->current_operand);
-        if (NULL == this->current_operand_type) ERROR;
-      }
-
       symbol->il_simple_operator->accept(*this);
-
-      this->current_operand = NULL;
-      this->current_operand_type = NULL;
       return NULL;
     }
+
 
     void *visit(il_function_call_c *symbol) {
       symbol_c* function_type_prefix = NULL;
@@ -502,16 +422,13 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       symbol_c* function_type_suffix = NULL;
       DECLARE_PARAM_LIST()
 
-      symbol_c *param_data_type = default_variable_name.current_type;
-
       function_call_param_iterator_c function_call_param_iterator(symbol);
 
       function_declaration_c *f_decl = (function_declaration_c *)symbol->called_function_declaration;
       if (f_decl == NULL) ERROR;
       
       /* determine the base data type returned by the function being called... */
-      search_base_type_c search_base_type;
-      function_type_prefix = (symbol_c *)f_decl->type_name->accept(search_base_type);
+      function_type_prefix = search_base_type_c::get_basetype_decl(f_decl->type_name);
       
       function_name = symbol->function_name;      
       
@@ -577,7 +494,8 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
          * use the default variable as a source of data to pass to those parameters!
          */
         if ((param_value == NULL) && (!used_defvar) && !fp_iterator.is_en_eno_param_implicit()) {
-          param_value = &this->default_variable_name;
+	  if (NULL == implicit_variable_current.datatype) ERROR;
+          param_value = &this->implicit_variable_current;
           used_defvar = true;
         }
 
@@ -617,8 +535,8 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       }
 
       /* Check whether we are calling an overloaded function! */
-      /* (fdecl_mutiplicity==2)  => calling overloaded function */
-      int fdecl_mutiplicity =  function_symtable.multiplicity(symbol->function_name);
+      /* (fdecl_mutiplicity > 1)  => calling overloaded function */
+      int fdecl_mutiplicity =  function_symtable.count(symbol->function_name);
       if (fdecl_mutiplicity == 0) ERROR;
       if (fdecl_mutiplicity == 1) 
         /* function being called is NOT overloaded! */
@@ -628,56 +546,33 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
         generate_inline(function_name, function_type_prefix, function_type_suffix, param_list, f_decl);
 
       CLEAR_PARAM_LIST()
-
-      /* the data type resulting from this operation... */
-      default_variable_name.current_type = function_type_prefix;
       return NULL;
     }
+
+
 
     /* | il_expr_operator '(' [il_operand] eol_list [simple_instr_list] ')' */
     //SYM_REF4(il_expression_c, il_expr_operator, il_operand, simple_instr_list, unused)
     void *visit(il_expression_c *symbol) {
-      /* We will be recursevely interpreting an instruction list,
-       * so we store a backup of the data type of the value currently stored
-       * in the default variable, and set the current data type to NULL
+      /* We will be recursevely interpreting an instruction list, so we store a backup of the implicit_variable_result/current.
+       * Notice that they will be overwriten while processing the parenthsized instruction list.
        */
-      symbol_c *old_current_default_variable_data_type = this->default_variable_name.current_type;
-      this->default_variable_name.current_type = NULL;
-
-     /* Pass the symbol->il_operand to the simple_instr_list visitor
-      * using the il_default_variable_init_value parameter...
-      * Note that the simple_instr_list_c visitor will set this parameter
-      * to NULL as soon as it does not require it any longer,
-      * so we don't do it here again after the
-      *   symbol->simple_instr_list->accept(*this);
-      * returns...
-      */
-      this->il_default_variable_init_value = symbol->il_operand;
+      // il_default_variable_c old_implicit_variable_current = this->implicit_variable_current;      // no longer needed as we do not call symbol->il_expr_operator->accept(*this);
+      
+      /* Stage2 will insert an artificial (and equivalent) LD <il_operand> to the simple_instr_list if necessary. We can therefore ignore the 'il_operand' entry! */
+      //if (NULL != symbol->il_operand) { do nothing!! }
 
       /* Now do the parenthesised instructions... */
-      /* NOTE: the following code line will get the variable
-       * this->default_variable_name.current_type updated!
-       */
+      /* NOTE: the following code line will get the variable this->implicit_variable_current.datatype updated!  */
       symbol->simple_instr_list->accept(*this);
 
       /* Now do the operation, using the previous result! */
-      /* NOTE: The result of the previous instruction list will be stored
-       * in a variable named IL_DEFVAR_BACK. This is done in the visitor
-       * to instruction_list_c objects...
-       */
-      this->current_operand = &(this->default_variable_back_name);
-      this->current_operand_type = this->default_variable_back_name.current_type;
-
-      this->default_variable_name.current_type = old_current_default_variable_data_type;
-      if (NULL == this->current_operand_type) ERROR;
-
-      symbol->il_expr_operator->accept(*this);
-
-      this->current_operand = NULL;
-      this->current_operand_type = NULL;
-      this->default_variable_back_name.current_type = NULL;
+      /* NOTE: Actually, we do not need to call this, as it can never be a function call, which is what we are handling here... */
+      // this->implicit_variable_current.datatype = old_current_default_variable_data_type;
+      // symbol->il_expr_operator->accept(*this);
       return NULL;
     }
+
 
     /* | function_name '(' eol_list [il_param_list] ')' */
     // SYM_REF2(il_formal_funct_call_c, function_name, il_param_list)
@@ -693,8 +588,7 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       if (f_decl == NULL) ERROR;
 
       /* determine the base data type returned by the function being called... */
-      search_base_type_c search_base_type;
-      function_type_prefix = (symbol_c *)f_decl->type_name->accept(search_base_type);
+      function_type_prefix = search_base_type_c::get_basetype_decl(f_decl->type_name);
       if (NULL == function_type_prefix) ERROR;
       
       function_name = symbol->function_name;
@@ -798,8 +692,8 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       }
 
       /* Check whether we are calling an overloaded function! */
-      /* (fdecl_mutiplicity==2)  => calling overloaded function */
-      int fdecl_mutiplicity =  function_symtable.multiplicity(symbol->function_name);
+      /* (fdecl_mutiplicity > 1)  => calling overloaded function */
+      int fdecl_mutiplicity =  function_symtable.count(symbol->function_name);
       if (fdecl_mutiplicity == 0) ERROR;
       if (fdecl_mutiplicity == 1) 
         /* function being called is NOT overloaded! */
@@ -809,228 +703,26 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
         generate_inline(function_name, function_type_prefix, function_type_suffix, param_list, f_decl);
 
       CLEAR_PARAM_LIST()
-
-      /* the data type resulting from this operation... */
-      default_variable_name.current_type = function_type_prefix;
       return NULL;
     }
+
+
 
     /* | simple_instr_list il_simple_instruction */
     // SYM_LIST(simple_instr_list_c)
-    void *visit(simple_instr_list_c *symbol) {
-      /* Check whether we should initiliase the il default variable... */
-      if (NULL != this->il_default_variable_init_value) {
-        /* Yes, we must... */
-        /* We will do it by instatiating a LD operator, and having this
-         * same generate_c_il_c class visiting it!
-         */
-        LD_operator_c ld_oper;
-        il_simple_operation_c il_simple_oper(&ld_oper, this->il_default_variable_init_value);
+    void *visit(simple_instr_list_c *symbol) {return iterator_visitor_c::visit(symbol);}
 
-        il_simple_oper.accept(*this);
-      }
 
-      /* this parameter no longer required... */
-      this->il_default_variable_init_value = NULL;
-
-      iterator_visitor_c::visit(symbol);
-
-      /* copy the result in the default variable to the variable
-       * used to pass the data out to the scope enclosing
-       * the current scope!
-       *
-       * We also need to update the data type currently stored within
-       * the variable used to pass the data to the outside scope...
-       */
-      this->default_variable_back_name.current_type = this->default_variable_name.current_type;
-      return NULL;
-    }
-    
     // SYM_REF1(il_simple_instruction_c, il_simple_instruction, symbol_c *prev_il_instruction;)
     void *visit(il_simple_instruction_c *symbol) {
-      return symbol->il_simple_instruction->accept(*this);
+      /* all previous IL instructions should have the same datatype (checked in stage3), so we get the datatype from the first previous IL instruction we find */
+      implicit_variable_current.datatype = (symbol->prev_il_instruction.empty())? NULL : symbol->prev_il_instruction[0]->datatype;
+      symbol->il_simple_instruction->accept(*this);
+      implicit_variable_current.datatype = NULL;
+      return NULL;      
     }
 
-    void *visit(LD_operator_c *symbol) {
-      /* the data type resulting from this operation... */
-      this->default_variable_name.current_type = this->current_operand_type;
-      return NULL;
-    }
 
-    void *visit(LDN_operator_c *symbol) {
-      /* the data type resulting from this operation... */
-      this->default_variable_name.current_type = this->current_operand_type;
-      return NULL;
-    }
-
-    void *visit(AND_operator_c *symbol) {
-      if (search_expression_type->is_binary_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        BYTE_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(OR_operator_c *symbol) {
-      if (search_expression_type->is_binary_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        BYTE_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(XOR_operator_c *symbol) {
-      if (search_expression_type->is_binary_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        BYTE_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(ANDN_operator_c *symbol) {
-      if (search_expression_type->is_binary_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        BYTE_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(ORN_operator_c *symbol) {
-      if (search_expression_type->is_binary_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        BYTE_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(XORN_operator_c *symbol) {
-      if (search_expression_type->is_binary_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        BYTE_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(ADD_operator_c *symbol) {
-      if (search_expression_type->is_time_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_time_type(this->current_operand_type)) {
-        /* the data type resulting from this operation... */
-        this->default_variable_name.current_type = this->current_operand_type;
-      }
-      else if (search_expression_type->is_num_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        NUM_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(SUB_operator_c *symbol) {
-      if (search_expression_type->is_time_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_time_type(this->current_operand_type)) {
-        /* the data type resulting from this operation... */
-        this->default_variable_name.current_type = this->current_operand_type;
-      }
-      else if (search_expression_type->is_num_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        NUM_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(MUL_operator_c *symbol) {
-      if (search_expression_type->is_time_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_integer_type(this->current_operand_type)) {
-        /* the data type resulting from this operation is unchanged! */
-      }
-      else if (search_expression_type->is_num_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        NUM_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(DIV_operator_c *symbol) {
-      if (search_expression_type->is_time_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_integer_type(this->current_operand_type)) {
-        /* the data type resulting from this operation is unchanged! */
-      }
-      else if (search_expression_type->is_num_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        NUM_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(MOD_operator_c *symbol) {
-      if (search_expression_type->is_num_type(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        NUM_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(GT_operator_c *symbol) {
-      if (!search_base_type.type_is_enumerated(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        CMP_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(GE_operator_c *symbol) {
-      if (!search_base_type.type_is_enumerated(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        CMP_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(EQ_operator_c *symbol) {
-      if (search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        CMP_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(LT_operator_c *symbol) {
-      if (!search_base_type.type_is_enumerated(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        CMP_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(LE_operator_c *symbol) {
-      if (!search_base_type.type_is_enumerated(this->default_variable_name.current_type) &&
-          search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        CMP_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
-
-    void *visit(NE_operator_c *symbol) {
-      if (search_expression_type->is_same_type(this->default_variable_name.current_type, this->current_operand_type)) {
-        CMP_operator_result_type();
-      }
-      else {ERROR;}
-      return NULL;
-    }
 
     /***************************************/
     /* B.3 - Language ST (Structured Text) */
@@ -1067,8 +759,7 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       function_name = symbol->function_name;
 
       /* determine the base data type returned by the function being called... */
-      search_base_type_c search_base_type;
-      function_type_prefix = (symbol_c *)f_decl->type_name->accept(search_base_type);
+      function_type_prefix = search_base_type_c::get_basetype_decl(f_decl->type_name);
       if (NULL == function_type_prefix) ERROR;
 
       /* loop through each function parameter, find the value we should pass
@@ -1163,8 +854,8 @@ class generate_c_inlinefcall_c: public generate_c_typedecl_c {
       }
 
       /* Check whether we are calling an overloaded function! */
-      /* (fdecl_mutiplicity==2)  => calling overloaded function */
-      int fdecl_mutiplicity =  function_symtable.multiplicity(symbol->function_name);
+      /* (fdecl_mutiplicity > 1)  => calling overloaded function */
+      int fdecl_mutiplicity =  function_symtable.count(symbol->function_name);
       if (fdecl_mutiplicity == 0) ERROR;
       if (fdecl_mutiplicity == 1) 
         /* function being called is NOT overloaded! */
