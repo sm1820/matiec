@@ -61,8 +61,23 @@
 
 
 
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
 
+/* Parse command line options passed from main.c !! */
 
+int  stage4_parse_options(char *options) {return 0;}
+
+void stage4_print_options(void) {
+  printf("          (no options available when generating IEC 61131-3 code)\n"); 
+}
+
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
 
 
 //class generate_iec_c: public iterator_visitor_c {
@@ -643,6 +658,35 @@ void *visit(fb_spec_init_c *symbol) {
   }
   return NULL;
 }
+
+
+
+/* ref_spec:  REF_TO (non_generic_type_name | function_block_type_name) */
+// SYM_REF1(ref_spec_c, type_name)
+void *visit(ref_spec_c *symbol) {
+  s4o.print("REF_TO ");
+  symbol->type_name->accept(*this);
+  return NULL;
+}
+
+
+/* For the moment, we do not support initialising reference data types */
+/* ref_spec_init: ref_spec; */ 
+/* SYM_REF0(ref_spec_init_c) */
+
+/* ref_type_decl: identifier ':' ref_spec_init */
+// SYM_REF2(ref_type_decl_c, ref_type_name, ref_spec_init)
+void *visit(ref_type_decl_c *symbol) {
+  symbol->ref_type_name->accept(*this);
+  s4o.print(" : ");
+  symbol->ref_spec_init->accept(*this);
+  return NULL;
+}
+
+
+
+
+
 
 
 
@@ -1856,6 +1900,7 @@ void *visit(il_assign_out_operator_c *symbol) {
 /***********************/
 /* B 3.1 - Expressions */
 /***********************/
+void *visit(ref_expression_c *symbol) {return  s4o.print("REF("); symbol->exp->accept(*this); s4o.print(")");} /* an extension to the IEC 61131-3 standard - based on the IEC 61131-3 v3 standard. Returns address of the varible! */
 void *visit(or_expression_c *symbol) {return print_binary_expression(symbol, symbol->l_exp, symbol->r_exp, " OR ");}
 void *visit(xor_expression_c *symbol) {return print_binary_expression(symbol, symbol->l_exp, symbol->r_exp, " XOR ");}
 void *visit(and_expression_c *symbol) {return print_binary_expression(symbol, symbol->l_exp, symbol->r_exp, " AND ");}

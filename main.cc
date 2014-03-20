@@ -109,10 +109,10 @@ void error_exit(const char *file_name, int line_no, const char *errmsg, ...) {
 
 
 static void printusage(const char *cmd) {
-  printf("\nsyntax: %s [-h] [-v] [-f] [-s] [-c] [-I <include_directory>] [-T <target_directory>] <input_file>\n", cmd);
-  printf("  h : show this help message\n");
-  printf("  v : print version number\n");  
-  printf("  f : display full token location on error messages\n");
+  printf("\nsyntax: %s [<options>] [-O <output_options>] [-I <include_directory>] [-T <target_directory>] <input_file>\n", cmd);
+  printf(" -h : show this help message\n");
+  printf(" -v : print version number\n");  
+  printf(" -f : display full token location on error messages\n");
       /******************************************************/
       /* whether we are supporting safe extensions          */
       /* as defined in PLCopen - Technical Committee 5      */
@@ -120,11 +120,14 @@ static void printusage(const char *cmd) {
       /* Part 1: Concepts and Function Blocks,              */
       /* Version 1.0 is Official Release                    */
       /******************************************************/
-  printf("  s : allow use of safe extensions (e.g. SAFExxx data types))\n");
-  printf("  n : allow use of nested comments\n");
-  printf("  c : create conversion functions for enumerated data types\n");
+  printf(" -s : allow use of safe extensions (e.g. SAFExxx data types))\n");
+  printf(" -n : allow use of nested comments (an IEC 61131-3 v3 feature)\n");
+  printf(" -r : allow use of REF() operator  (an IEC 61131-3 v3 feature)\n");
+  printf(" -c : create conversion functions for enumerated data types\n");
+  printf(" -O : options for output (code generation) stage. Available options for %s are...\n", cmd);
+  stage4_print_options();
   printf("\n");
-  printf("%s - Copyright (C) 2003-2011 \n"
+  printf("%s - Copyright (C) 2003-2014 \n"
          "This program comes with ABSOLUTELY NO WARRANTY!\n"
          "This is free software licensed under GPL v3, and you are welcome to redistribute it under the conditions specified by this license.\n", PACKAGE_NAME);
 }
@@ -143,20 +146,20 @@ int main(int argc, char **argv) {
   stage1_2_options.full_token_loc       = false; /* error messages specify full token location */
   stage1_2_options.conversion_functions = false; /* Create a conversion function for derived datatype */
   stage1_2_options.nested_comments      = false; /* Allow the use of nested comments. */
+  stage1_2_options.ref_operator         = false; /* Allow the use of REF() operator. */
   stage1_2_options.includedir           = NULL;  /* Include directory, where included files will be searched for... */
 
   /******************************************/
   /*   Parse command line options...        */
   /******************************************/
-  while ((optres = getopt(argc, argv, ":nhvfscI:T:")) != -1) {
+  while ((optres = getopt(argc, argv, ":nhvfrscI:T:O:")) != -1) {
     switch(optres) {
     case 'h':
       printusage(argv[0]);
       return 0;
 
     case 'v':
-      fprintf(stdout, "%s version %s\n"
-		      "changeset id: %s\n", PACKAGE_NAME, PACKAGE_VERSION, HGVERSION);      
+      fprintf(stdout, "%s version %s\n" "changeset id: %s\n", PACKAGE_NAME, PACKAGE_VERSION, HGVERSION);      
       return 0;
 
     case 'f':
@@ -165,6 +168,10 @@ int main(int argc, char **argv) {
 
     case 's':
       stage1_2_options.safe_extensions = true;
+      break;
+
+    case 'r':
+      stage1_2_options.ref_operator = true;
       break;
 
     case 'c':
@@ -193,7 +200,11 @@ int main(int argc, char **argv) {
       builddir = optarg;
       break;
 
-    case ':':       /* -I or -T without operand */
+    case 'O':
+      if (stage4_parse_options(optarg) < 0) errflg++;
+      break;
+
+    case ':':       /* -I, -T, or -O without operand */
       fprintf(stderr, "Option -%c requires an operand\n", optopt);
       errflg++;
       break;

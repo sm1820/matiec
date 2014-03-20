@@ -179,17 +179,6 @@ b*/
     }
 
 
-/* A counter to track the order by which each token is processed.
- * NOTE: This counter is not exactly linear (i.e., it does not get incremented by 1 for each token).
- *       i.e.. it may get incremented by more than one between two consecutive tokens.
- *       This is due to the fact that the counter gets incremented every 'user action' in flex,
- *       however not every user action will result in a token being passed to bison.
- *       Nevertheless this is still OK, as we are only interested in the relative
- *       ordering of tokens...
- */
-static long int current_order = 0;
-
-
 /* Macro that is executed for every action.
  * We use it to pass the location of the token
  * back to the bison parser...
@@ -206,6 +195,8 @@ static long int current_order = 0;
 	current_tracking->currentTokenStart = current_tracking->currentChar;	\
 	current_order++;							\
 	}
+
+
 
 /* Since this lexical parser we defined only works in ASCII based
  * systems, we might as well make sure it is being compiled on
@@ -510,8 +501,17 @@ file_include_pragma			{file_include_pragma_beg}{file_include_pragma_filename}{fi
 
 
 %{
-#define MAX_INCLUDE_DEPTH 16
 
+/* A counter to track the order by which each token is processed.
+ * NOTE: This counter is not exactly linear (i.e., it does not get incremented by 1 for each token).
+ *       i.e.. it may get incremented by more than one between two consecutive tokens.
+ *       This is due to the fact that the counter gets incremented every 'user action' in flex,
+ *       however not every user action will result in a token being passed to bison.
+ *       Nevertheless this is still OK, as we are only interested in the relative
+ *       ordering of tokens...
+ */
+static long int current_order = 0;
+  
 typedef struct {
     int eof;
     int lineNumber;
@@ -521,6 +521,12 @@ typedef struct {
     char *buffer;
     FILE *in_file;
   } tracking_t;
+
+/* A forward declaration of a function defined at the end of this file. */
+void FreeTracking(tracking_t *tracking);
+
+
+#define MAX_INCLUDE_DEPTH 16
 
 typedef struct {
 	  YY_BUFFER_STATE buffer_state;
@@ -984,7 +990,7 @@ incompl_location	%[IQM]\*
 			       */
 			  if (include_stack_ptr == 0) {
 			      // fclose(yyin);           // Must not do this!!
-			      // free(current_tracking); // Must not do this!!
+			      // FreeTracking(current_tracking); // Must not do this!!
 			      /* yyterminate() terminates the scanner and returns a 0 to the 
 			       * scanner's  caller, indicating "all done".
 			       *	
@@ -996,7 +1002,7 @@ incompl_location	%[IQM]\*
 			    yyterminate();
 			  } else {
 			    fclose(yyin);
-			    free(current_tracking);
+			    FreeTracking(current_tracking);
 			    --include_stack_ptr;
 			    yy_delete_buffer(YY_CURRENT_BUFFER);
 			    yy_switch_to_buffer((include_stack[include_stack_ptr]).buffer_state);
@@ -1244,6 +1250,9 @@ END_CONFIGURATION	BEGIN(INITIAL); return END_CONFIGURATION;
 	/******************************************************/
 	/******************************************************/
 
+
+REF	{if (get_opt_ref_operator()) return REF;    else unput(0);}		/* Keyword in IEC 61131-3 v3 */
+REF_TO	{/*if (get_opt_ref_operator()) return REF_TO; else */unput(0);}		/* Keyword in IEC 61131-3 v3 */
 
 EN	return EN;			/* Keyword */
 ENO	return ENO;			/* Keyword */
@@ -1771,7 +1780,7 @@ _			/* do nothing - eat it up!*/
 /* Tracking Functions... */
 /*************************/
 
-#define MAX_BUFFER_LENGTH 1000
+#define MAX_LINE_LENGTH 1024
 
 tracking_t *GetNewTracking(FILE* in_file) {
   tracking_t* new_env = new tracking_t;
@@ -1780,9 +1789,15 @@ tracking_t *GetNewTracking(FILE* in_file) {
   new_env->currentChar = 0;
   new_env->lineLength = 0;
   new_env->currentTokenStart = 0;
-  new_env->buffer = (char*)malloc(MAX_BUFFER_LENGTH);
+  new_env->buffer = (char*)malloc(MAX_LINE_LENGTH);
   new_env->in_file = in_file;
   return new_env;
+}
+
+
+void FreeTracking(tracking_t *tracking) {
+  free(tracking->buffer);
+  delete tracking;
 }
 
 
@@ -1798,7 +1813,7 @@ int GetNextChar(char *b, int maxBuffer) {
     current_tracking->currentTokenStart = 1;
     current_tracking->eof = false;
     
-    p = fgets(current_tracking->buffer, MAX_BUFFER_LENGTH, current_tracking->in_file);
+    p = fgets(current_tracking->buffer, MAX_LINE_LENGTH, current_tracking->in_file);
     if (  p == NULL  ) {
       if (  ferror(current_tracking->in_file)  )
         return 0;
@@ -1806,8 +1821,12 @@ int GetNextChar(char *b, int maxBuffer) {
       return 0;
     }
     
-    current_tracking->lineNumber++;
     current_tracking->lineLength = strlen(current_tracking->buffer);
+    
+    /* only increment line number if the buffer was big enough to read the whole line! */
+    char last_char = current_tracking->buffer[current_tracking->lineLength - 1];
+    if (('\n' == last_char) || ('\r' == last_char))  // '\r' ---> CR, '\n'  ---> LF
+      current_tracking->lineNumber++;
   }
   
   b[0] = current_tracking->buffer[current_tracking->currentChar];
@@ -1917,12 +1936,13 @@ void unput_text(unsigned int n) {
    * We therefore determine how many newlines are in the text we are returning,
    * and decrement the line counter acordingly...
    */
-  /*unsigned int i;
+  /*
+  unsigned int i;
   
   for (i = n; i < strlen(yytext); i++)
     if (yytext[i] == '\n')
-      current_tracking->lineNumber--;*/
-
+      current_tracking->lineNumber--;
+  */
   /* now return all the text back to the input stream... */
   yyless(n);
 }

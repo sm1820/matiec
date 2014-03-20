@@ -132,6 +132,12 @@
 #define GET_EXTERNAL "__GET_EXTERNAL"
 #define GET_EXTERNAL_FB "__GET_EXTERNAL_FB"
 #define GET_LOCATED "__GET_LOCATED"
+
+#define GET_VAR_REF "__GET_VAR_REF"
+#define GET_EXTERNAL_REF "__GET_EXTERNAL_REF"
+#define GET_EXTERNAL_FB_REF "__GET_EXTERNAL_FB_REF"
+#define GET_LOCATED_REF "__GET_LOCATED_REF"
+
 #define GET_VAR_BY_REF "__GET_VAR_BY_REF"
 #define GET_EXTERNAL_BY_REF "__GET_EXTERNAL_BY_REF"
 #define GET_EXTERNAL_FB_BY_REF "__GET_EXTERNAL_FB_BY_REF"
@@ -157,6 +163,41 @@
 
 /* please see the comment before the RET_operator_c visitor for details... */
 #define END_LABEL VAR_LEADER "end"
+
+
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+/***********************************************************************/
+
+/* Parse command line options passed from main.c !! */
+#include <stdlib.h> // for getsybopt()
+
+static int generate_line_directives__ = 0;
+
+int  stage4_parse_options(char *options) {
+  enum {                    LINE_OPT = 0             /*, SOME_OTHER_OPT, YET_ANOTHER_OPT */};
+  char *const token[] = { /*[LINE_OPT]=*/(char *)"l" /*, SOME_OTHER_OPT, ...             */, NULL };
+  /* unfortunately, the above commented out syntax for array initialization is valid in C, but not in C++ */
+  
+  char *subopts = options;
+  char *value;
+  int opt;
+
+  while (*subopts != '\0') {
+    switch (getsubopt(&subopts, token, &value)) {
+      case LINE_OPT: generate_line_directives__  = 1; break;
+      default      : fprintf(stderr, "Unrecognized option: -O %s\n", value); return -1; break;
+     }
+  }     
+  return 0;
+}
+
+
+void stage4_print_options(void) {
+  printf("          (options must be separated by commas. Example: 'l,w,x')\n"); 
+  printf("      l : insert '#line' directives in generated C code.\n"); 
+}
 
 
 /***********************************************************************/
@@ -351,7 +392,7 @@ class analyse_variable_c: public search_visitor_c {
     
     static bool is_complex_type(symbol_c *symbol) {
       if (NULL == symbol) ERROR;
-      if (!get_datatype_info_c::is_type_valid     (symbol->datatype)) ERROR;
+      if (!get_datatype_info_c::is_type_valid     (symbol->datatype)) return false;
       return (   get_datatype_info_c::is_structure(symbol->datatype) 
               || get_datatype_info_c::is_array    (symbol->datatype) 
              );
