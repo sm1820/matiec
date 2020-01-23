@@ -1114,6 +1114,8 @@ typedef struct YYLTYPE {
 %type  <leaf>	optional_instance_specific_initializations
 // helper symbol for configuration_declaration
 %type  <list>	resource_declaration_list
+// helper symbol for resource_declaration_list_ Needed to avoid infinite loop when handling errors.
+%type  <list>   resource_declaration_list_
 %type  <leaf>	resource_declaration
 %type  <leaf>	single_resource_declaration
 // helper symbol for single_resource_declaration
@@ -6136,13 +6138,20 @@ optional_instance_specific_initializations:
 
 // helper symbol for configuration_declaration //
 resource_declaration_list:
+  resource_declaration_list_
+        {$$ = $1;  yyerrok;}
+;
+
+// helper symbol for resource_declaration_list //
+// used to avoid getting into an infinite loop when handling errors //
+resource_declaration_list_:
   resource_declaration
 	{$$ = new resource_declaration_list_c(locloc(@$)); $$->add_element($1);}
-| resource_declaration_list resource_declaration
+| resource_declaration_list_ resource_declaration
 	{$$ = $1; $$->add_element($2);}
 /* ERROR_CHECK_BEGIN */
-| resource_declaration_list error
-	{$$ = $1; print_err_msg(locf(@2), locl(@2), "unexpected token after resource declaration."); yyerrok;}
+| resource_declaration_list_ error
+	{$$ = $1; print_err_msg(locf(@2), locl(@2), "unexpected token after resource declaration.");}
 /* ERROR_CHECK_END */
 ;
 
