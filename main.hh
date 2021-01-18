@@ -151,9 +151,9 @@ extern void error_exit(const char *file_name, int line_no, const char *errmsg = 
 
 
 /* get the printf format macros for printing variables of fixed data size
- * e.g.  int64_t v; printf("value=%"PRId64" !!\n", v);
- * e.g. uint64_t v; printf("value=%"PRIu64" !!\n", v);
- * e.g. uint64_t v; printf("value=%"PRIx64" !!\n", v);  // hexadecimal format
+ * e.g.  int64_t v; printf("value=%" PRId64 " !!\n", v);
+ * e.g. uint64_t v; printf("value=%" PRIu64 " !!\n", v);
+ * e.g. uint64_t v; printf("value=%" PRIx64 " !!\n", v);  // hexadecimal format
  */
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
