@@ -6049,14 +6049,14 @@ configuration_declaration:
    optional_access_declarations
    optional_instance_specific_initializations
   END_CONFIGURATION
-  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid configuration name defined in configuration declaration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid configuration name defined in configuration declaration."); ++yynerrs;}
 | CONFIGURATION error
    global_var_declarations_list
    resource_declaration_list
    optional_access_declarations
    optional_instance_specific_initializations
   END_CONFIGURATION
-  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid configuration name defined in configuration declaration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid configuration name defined in configuration declaration."); ++yynerrs;}
 /*  Rule already covered by the rule to handle the preparse state!
 | CONFIGURATION configuration_name
    global_var_declarations_list
@@ -6071,7 +6071,7 @@ configuration_declaration:
    optional_access_declarations
    optional_instance_specific_initializations
   END_CONFIGURATION
-  {$$ = NULL; print_err_msg(locf(@4), locl(@4), "invalid resource(s) defined in configuration declaration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@4), locl(@4), "invalid resource(s) defined in configuration declaration."); ++yynerrs;}
 /*| CONFIGURATION configuration_name
    global_var_declarations_list
    single_resource_declaration
@@ -6080,16 +6080,16 @@ configuration_declaration:
    optional_access_declarations
    optional_instance_specific_initializations
   END_OF_INPUT
-  {$$ = NULL; print_err_msg(locf(@1), locl(@2), "unclosed configuration declaration."); yyerrok;}*/
+  {$$ = NULL; print_err_msg(locf(@1), locl(@2), "unclosed configuration declaration."); ++yynerrs;}*/
 | CONFIGURATION configuration_name
    global_var_declarations_list
    resource_declaration_list
    optional_access_declarations
    optional_instance_specific_initializations
   END_OF_INPUT
-  {$$ = NULL; print_err_msg(locf(@1), locl(@2), "unclosed configuration declaration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@1), locl(@2), "unclosed configuration declaration."); ++yynerrs;}
 | CONFIGURATION error END_CONFIGURATION
-	{$$ = NULL; print_err_msg(locf(@2), locl(@2), "unknown error in configuration declaration."); yyerrok;}
+	{$$ = NULL; print_err_msg(locf(@2), locl(@2), "unknown error in configuration declaration."); ++yynerrs;}
 /* ERROR_CHECK_END */
 ;
 

@@ -55,6 +55,7 @@
 #include "visitor.hh"
 
 #include <iostream>
+#include <cassert>
 
 
 /******************/
@@ -168,6 +169,7 @@ iterator_visitor_c::~iterator_visitor_c(void) {return;}
 
 void *iterator_visitor_c::visit_list(list_c *list) {
   for(int i = 0; i < list->n; i++) {
+    assert(list->get_element(i));
     list->get_element(i)->accept(*this);
   }
   return NULL;
