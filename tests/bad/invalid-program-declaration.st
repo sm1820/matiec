@@ -1,0 +1,6 @@
+PROGRAM
+  VAR
+    a : REAL;
+  END_VAR
+  a := 19.4;
+END_PROGRAM

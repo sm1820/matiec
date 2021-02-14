@@ -5452,9 +5452,9 @@ program_declaration:
 	}
 /* ERROR_CHECK_BEGIN */
 | PROGRAM program_var_declarations_list function_block_body END_PROGRAM
-  {$$ = NULL; print_err_msg(locl(@1), locf(@2), "no program name defined in program declaration.");}
+  {$$ = NULL; print_err_msg(locl(@1), locf(@2), "no program name defined in program declaration."); yynerrs++; }
 | PROGRAM error program_var_declarations_list function_block_body END_PROGRAM
-	{$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid program name in program declaration."); yyerrok;}
+	{$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid program name in program declaration."); yynerrs++;}
 | PROGRAM prev_declared_program_type_name function_block_body END_PROGRAM
 	{$$ = NULL; print_err_msg(locl(@2), locf(@3), "no variable(s) declared in program declaration."); yynerrs++;}
 | PROGRAM prev_declared_program_type_name program_var_declarations_list END_PROGRAM
@@ -5466,7 +5466,7 @@ program_declaration:
 | PROGRAM prev_declared_program_type_name program_var_declarations_list function_block_body END_OF_INPUT
 	{$$ = NULL; print_err_msg(locf(@1), locl(@2), "unclosed program declaration."); yynerrs++;}
 | PROGRAM error END_PROGRAM
-	{$$ = NULL; print_err_msg(locf(@2), locl(@2), "unknown error in program declaration."); yyerrok;}
+	{$$ = NULL; print_err_msg(locf(@2), locl(@2), "unknown error in program declaration."); yynerrs++;}
 /* ERROR_CHECK_END */
 ;
 
@@ -6463,11 +6463,11 @@ program_configuration:
 | PROGRAM NON_RETAIN program_name optional_task_name ':' identifier optional_prog_conf_elements
   {$$ = NULL; print_err_msg(locf(@6), locl(@6), "invalid program type name after ':' in program configuration."); yynerrs++;}
 | PROGRAM error program_name optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
-  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "unexpected token after 'PROGRAM' in program configuration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "unexpected token after 'PROGRAM' in program configuration."); yynerrs++;}
 | PROGRAM RETAIN error program_name optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
-  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "unexpected token after 'RETAIN' in retentive program configuration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "unexpected token after 'RETAIN' in retentive program configuration."); yynerrs++;}
 | PROGRAM NON_RETAIN error program_name optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
-  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "unexpected token after 'NON_RETAIN' in non-retentive program configuration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "unexpected token after 'NON_RETAIN' in non-retentive program configuration."); yynerrs++;}
 | PROGRAM optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
   {$$ = NULL; print_err_msg(locl(@1), locf(@2), "no program name defined in program configuration."); yynerrs++;}
 | PROGRAM RETAIN optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
@@ -6475,11 +6475,11 @@ program_configuration:
 | PROGRAM NON_RETAIN optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
   {$$ = NULL; print_err_msg(locl(@2), locf(@3), "no program name defined in non-retentive program configuration."); yynerrs++;}
 | PROGRAM error optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
-  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid program name defined in program configuration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@2), locl(@2), "invalid program name defined in program configuration."); yynerrs++;}
 | PROGRAM RETAIN error optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
-  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "invalid program name defined in retentive program configuration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "invalid program name defined in retentive program configuration."); yynerrs++;}
 | PROGRAM NON_RETAIN error optional_task_name ':' prev_declared_program_type_name optional_prog_conf_elements
-  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "invalid program name defined in non-retentive program configuration."); yyerrok;}
+  {$$ = NULL; print_err_msg(locf(@3), locl(@3), "invalid program name defined in non-retentive program configuration."); yynerrs++;}
 | PROGRAM program_name optional_task_name prev_declared_program_type_name optional_prog_conf_elements
   {$$ = NULL; print_err_msg(locl(@3), locf(@4), "':' missing after program name or optional task name in program configuration."); yynerrs++;}
 | PROGRAM RETAIN program_name optional_task_name prev_declared_program_type_name optional_prog_conf_elements
