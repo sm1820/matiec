@@ -22,6 +22,7 @@
  * used in safety-critical situations without a full and competent review.
  */
 
+#include <cassert>
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -667,23 +668,26 @@ class calculate_common_ticktime_c: public iterator_visitor_c {
       common_period = 1; /* first tick time equals single/first task period */
     }
     
-    unsigned long long GCM(unsigned long long a, unsigned long long b) {
-      if(a >= b){
+    unsigned long long gcd(unsigned long long a, unsigned long long b) {
+      assert(b != 0);
+      if(a >= b) {
         unsigned long long c = a % b;
-        if (c == 0)
-          return b;
-        else
-          return GCM(b, c);
-      } else {
-        return GCM(b, a);
+        return (c == 0) ? b : gcd(b, c);
       }
+      return gcd(b, a);
     }
 
     bool update_ticktime(unsigned long long time) {
       if (common_ticktime == 0)
         common_ticktime = time;
       else 
-        common_ticktime = GCM(time, common_ticktime);
+        common_ticktime = gcd(time, common_ticktime);
+
+      /* Set the default period that equals to a single/first task period. */
+      if (common_ticktime == 0) {
+        common_period = 1;
+        return true;
+      }
 
       unsigned long task_period = (time / common_ticktime); /* in tick count */ 
       
@@ -695,7 +699,7 @@ class calculate_common_ticktime_c: public iterator_visitor_c {
        * LCM(a,b) = a*b/GCD(a,b)
        */
       unsigned long long new_common_period =
-        common_period * task_period / GCM(common_period, task_period);
+        common_period * task_period / gcd(common_period, task_period);
 
       if(new_common_period >= UL_MAX){
         return false;
