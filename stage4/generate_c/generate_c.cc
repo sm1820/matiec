@@ -669,28 +669,30 @@ class calculate_common_ticktime_c: public iterator_visitor_c {
     }
     
     unsigned long long gcd(unsigned long long a, unsigned long long b) {
-      assert(b != 0);
-      if(a >= b) {
-        unsigned long long c = a % b;
-        return (c == 0) ? b : gcd(b, c);
-      }
-      return gcd(b, a);
+      if (a == 0)
+         return b;
+      if (b == 0)
+         return a;
+      if (a == b)
+        return a;
+      if (a > b)
+        return gcd(a-b, b);
+      return gcd(a, b-a);
     }
 
     bool update_ticktime(unsigned long long time) {
+      common_ticktime = gcd(time, common_ticktime);
       if (common_ticktime == 0)
         common_ticktime = time;
-      else 
-        common_ticktime = gcd(time, common_ticktime);
 
       /* Set the default period that equals to a single/first task period. */
-      if (common_ticktime == 0) {
+      if (common_ticktime == 0 || time == 0) {
         common_period = 1;
         return true;
       }
 
-      unsigned long task_period = (time / common_ticktime); /* in tick count */ 
-      
+      unsigned long task_period = (time / common_ticktime); /* in tick count */
+
       /* New Common Period is 
        * Least Common Multiple of 
        * Previous Common Period and
